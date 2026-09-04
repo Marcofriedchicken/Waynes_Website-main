@@ -56,7 +56,7 @@ const addOns = [
     description:
       "Deep clean removes grease, grime, and buildup - leaving it spotless.",
     duration: "30 mins",
-    price: 500,
+    price: 800,
     durationMinutes: 30,
   },
   {
@@ -69,21 +69,21 @@ const addOns = [
     durationMinutes: 5,
   },
   {
-    id: "water-spot-removal",
-    name: "Water Spot Removal",
+    id: "water-spot-treatment",
+    name: "Water Spot Treatment",
     description:
       "Removes stubborn water spots and restores a flawless shine while eliminating the risk of paint etching.",
     duration: "10 mins",
-    price: 500,
+    price: 800,
     durationMinutes: 10,
   },
   {
-    id: "quick-beads",
-    name: "Quick Beads",
+    id: "hydrophobic-treatment",
+    name: "Hydrophobic Treatment",
     description:
-      "Boosts shine, enhances gloss, and keeps your paint looking freshly detailed between washes.",
+      "Quick Beads boosts shine, enhances water beading, and keeps your paint looking freshly detailed between washes.",
     duration: "10 mins",
-    price: 300,
+    price: 800,
     durationMinutes: 10,
   },
   {
@@ -111,9 +111,10 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedTime, setSelectedTime] = useState("")
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [availableSlots, setAvailableSlots] = useState<string[]>([])
+  const [availableSlots, setAvailableSlots] = useState<any[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [slotError, setSlotError] = useState("")
+  const [selectedSlotOvernight, setSelectedSlotOvernight] = useState(false)
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -230,6 +231,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
             appointmentDate: selectedDate ? formatDateForApi(selectedDate) : "",
             appointmentTime: selectedTime,
             totalAmount: calculateTotal(),
+            overnight: selectedSlotOvernight,
           }),
         })
 
@@ -281,40 +283,44 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
 
   const selectedAddOnsData = addOns.filter((addon) => selectedAddOns.includes(addon.id))
   const addOnVisibilityByService: Record<string, string[]> = {
-    "express-wash": [
+    "essentail-wash": [
       "headlight-restoration",
       "engine-bay-cleaning",
       "back-to-zero",
-      "water-spot-removal",
-      "quick-beads",
+      "water-spot-treatment",
+      "hydrophobic-treatment",
     ],
-    "express-full-detail": [
+    "premium-wash": [
       "headlight-restoration",
       "engine-bay-cleaning",
       "back-to-zero",
-      "water-spot-removal",
-      "quick-beads",
+      "water-spot-treatment",
+      "hydrophobic-treatment",
     ],
-    "deluxe-detail": [
+    "bronze-pack": [
       "headlight-restoration",
       "engine-bay-cleaning",
-      "water-spot-removal",
+      "water-spot-treatment",
       "deluxe-interior-detail",
+      "hydrophobic-treatment",
     ],
-    "premium-detail": [
+    "silver-pack": [
       "headlight-restoration",
       "engine-bay-cleaning",
       "deluxe-interior-detail",
+      "hydrophobic-treatment",
     ],
-    "executive-detail": [
+    "gold-pack": [
       "headlight-restoration",
       "deluxe-interior-detail",
+      "hydrophobic-treatment",
     ],
     "paint-correction": [
       "headlight-restoration",
       "engine-bay-cleaning",
       "back-to-zero",
       "deluxe-interior-detail",
+      "hydrophobic-treatment",
     ],
     "ceramic-coating-3yr": [
       "headlight-restoration",
@@ -355,7 +361,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
     : 0
 
   const isPaintCorrectionAdditive =
-    baseServiceForUpgrades === "express-full-detail" && selectedService === "paint-correction"
+    baseServiceForUpgrades === "premium-wash" && selectedService === "paint-correction"
 
   const billedServicePrice = isPaintCorrectionAdditive
     ? baseServicePrice + selectedServicePrice
@@ -420,7 +426,16 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
       setSelectedTime("")
       try {
         const date = formatDateForApi(selectedDate)
-        const response = await fetch(`/api/availability?date=${date}`)
+        const params = new URLSearchParams()
+        params.set("date", date)
+        if (selectedServiceData?.title) params.set("serviceTitle", selectedServiceData.title)
+        if (selectedAddOnsData.length > 0) {
+          params.set(
+            "addons",
+            selectedAddOnsData.map((a) => encodeURIComponent(a.name.split("(")[0].trim())).join(","),
+          )
+        }
+        const response = await fetch(`/api/availability?${params.toString()}`)
         const result = await response.json()
         if (!response.ok) {
           throw new Error(result?.error || "Failed to load slots.")
@@ -852,7 +867,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                               : upgrade.priceValue
                             const priceDifference = Math.max(upgradePrice - baseServicePrice, 0)
                             const showAsAdditional =
-                              baseServiceForUpgrades === "express-full-detail" && upgrade.id === "paint-correction"
+                              baseServiceForUpgrades === "premium-wash" && upgrade.id === "paint-correction"
 
                             return (
                               <button
@@ -1068,17 +1083,28 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                           <div className="text-sm text-gray-500">Loading available slots...</div>
                         ) : (
                           <div className="grid grid-cols-3 gap-2">
-                            {availableSlots.map((time) => (
+                            {availableSlots.map((slot) => (
                               <button
-                                key={time}
-                                onClick={() => setSelectedTime(time)}
+                                key={slot.time}
+                                onClick={() => {
+                                  if (!slot.available) return
+                                  setSelectedTime(slot.time)
+                                  setSelectedSlotOvernight(Boolean(slot.overnight))
+                                }}
+                                disabled={!slot.available}
+                                title={!slot.available ? slot.reason || "Unavailable" : undefined}
                                 className={`p-3 rounded-xl border-2 text-center text-sm font-medium transition-all ${
-                                  selectedTime === time
+                                  selectedTime === slot.time
                                     ? "border-[#D4A843] bg-[#D4A843]/5 text-gray-900"
-                                    : "border-gray-200 text-gray-600 hover:border-gray-300"
+                                    : slot.available
+                                    ? "border-gray-200 text-gray-600 hover:border-gray-300"
+                                    : "border-gray-200 text-gray-300 cursor-not-allowed"
                                 }`}
                               >
-                                {formatTimeLabel(time)}
+                                <div className="font-medium">{formatTimeLabel(slot.time)}</div>
+                                <div className="text-xs mt-1 text-gray-500">
+                                  {slot.overnight ? "Next-day pickup" : slot.completion ? `Done by ${formatTimeLabel(slot.completion)}` : ""}
+                                </div>
                               </button>
                             ))}
                           </div>
@@ -1119,6 +1145,9 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                         <span className="text-gray-500">Vehicle</span>
                         <span className="font-semibold text-gray-900">{vehicleMake} {vehicleModel}</span>
                       </div>
+                      {selectedSlotOvernight && (
+                        <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-700">Your vehicle will be ready for pickup the following day. Our team will contact you to confirm your pickup time.</div>
+                      )}
                       {selectedAddOnsData.length > 0 && (
                         <div className="flex justify-between items-start gap-4">
                           <span className="text-gray-500">Selected Add-ons</span>

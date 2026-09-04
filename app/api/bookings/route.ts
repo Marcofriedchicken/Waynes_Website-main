@@ -35,6 +35,7 @@ type BookingPayload = {
   appointmentDate: string
   appointmentTime: string
   totalAmount: number
+  overnight?: boolean
 }
 
 const currency = (value: number) => `PHP ${value.toLocaleString()}`
@@ -62,12 +63,11 @@ function formatDuration(minutes: number) {
 }
 
 const SERVICE_DURATIONS: Record<string, number> = {
-  "Express Wash": 35,
-  "Express Full Wash": 60,
-  "Deluxe Detail": 60,
+  "Essentail Wash": 35,
   "Premium Wash": 60,
-  "Premium Detail": 80,
-  "Executive Detail": 105,
+  "Bronze Pack": 60,
+  "Silver Pack": 80,
+  "Gold Pack": 105,
   "Elite Detail": 105,
   "Paint Correction": 120,
   "Ceramic Coating 3yr": 480,
@@ -80,8 +80,8 @@ const ADDON_DURATIONS: Record<string, number> = {
   "Headlight Restoration": 120,
   "Engine Bay Cleaning": 30,
   "Back to Zero Sanitation": 5,
-  "Water Spot Removal": 10,
-  "Quick Beads": 10,
+  "Water Spot Treatment": 10,
+  "Hydrophobic Treatment": 10,
   "Deluxe Interior Detail": 30,
 }
 
@@ -154,11 +154,11 @@ async function syncToHubSpot(payload: BookingPayload) {
 
     // Create deal
     const serviceMap: Record<string, string> = {
-  'Express Wash': 'express_wash',
-  'Express Full Wash': 'express_full_wash',
-  'Deluxe Detail': 'deluxe_detail',
-  'Premium Detail': 'premium_detail',
-  'Executive Detail': 'executive_detail',
+  'Essentail Wash': 'essentail_wash',
+  'Premium Wash': 'premium_wash',
+  'Bronze Pack': 'bronze_pack',
+  'Silver Pack': 'silver_pack',
+  'Gold Pack': 'gold_pack',
   'Paint Correction': 'paint_correction',
   'Diamond Ceramic': 'diamond_ceramic',
   'Titanium Ceramic Shield': 'titanium_ceramic_shield',
@@ -256,6 +256,7 @@ export async function POST(request: Request) {
       `Add-ons:\n${addonsText}`,
       `Schedule: ${slotLabel}`,
       `Estimated Duration: ${durationLabel}`,
+      payload.overnight ? `Overnight booking: Vehicle ready next day.` : null,
       `Total Amount: ${currency(payload.totalAmount)}`,
     ].join("\n")
 
@@ -298,6 +299,7 @@ export async function POST(request: Request) {
               ${payload.addons.length > 0 ? `<p style="margin:0 0 8px; white-space:pre-line; color:#FFFFFF;">${addonsText}</p>` : ""}
               <p style="margin:0 0 8px;"><strong style="color:#FFFFFF;">Schedule:</strong> ${slotLabel}</p>
               <p style="margin:0 0 8px;"><strong style="color:#FFFFFF;">Estimated Time:</strong> ${durationLabel}</p>
+              ${payload.overnight ? `<div style="margin:8px 0; padding:10px; border-radius:8px; background:#FFF8E1; color:#6B4A00;">Your vehicle will be ready for pickup the following day. Our team will contact you to confirm your pickup time.</div>` : ""}
               <p style="margin:0; color:#D4A843; font-size:18px; font-weight:800;"><strong>Total:</strong> ${currency(payload.totalAmount)}</p>
             </div>
       ${emailShellEnd}
@@ -318,6 +320,7 @@ export async function POST(request: Request) {
               ${payload.addons.length > 0 ? `<p style="margin:0 0 8px; white-space:pre-line; color:#FFFFFF;">${addonsText}</p>` : ""}
               <p style="margin:0 0 8px;"><strong style="color:#FFFFFF;">Schedule:</strong> ${slotLabel}</p>
               <p style="margin:0 0 8px;"><strong style="color:#FFFFFF;">Estimated Time:</strong> ${durationLabel}</p>
+              ${payload.overnight ? `<div style="margin:8px 0; padding:10px; border-radius:8px; background:#FFF8E1; color:#6B4A00;">Overnight booking — vehicle will be ready next day.</div>` : ""}
               <p style="margin:0; color:#D4A843; font-size:18px; font-weight:800;"><strong>Total:</strong> ${currency(payload.totalAmount)}</p>
             </div>
       ${emailShellEnd}

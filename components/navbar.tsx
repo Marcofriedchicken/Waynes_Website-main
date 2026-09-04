@@ -10,6 +10,7 @@ const navLinks = [
   { name: "WHY US", href: "#why-us" },
   { name: "SHOP", href: "#shop" },
   { name: "REVIEWS", href: "#reviews" },
+  { name: "FIND US", href: "#find-us" },
   { name: "CONTACT", href: "#contact" },
 ]
 
@@ -102,8 +103,12 @@ export function Navbar({ onBookNow }: NavbarProps) {
                     key={link.name}
                     href={link.href}
                     onClick={(e) => handleNavClick(e, link.href)}
-                    className="text-white/80 hover:text-white transition-colors duration-100 font-medium text-sm tracking-wider"
-                    whileHover={{ y: -2, transition: { duration: 0.12 } }}
+                    className={
+                      link.isButton
+                        ? "bg-[#ED0407] text-white px-5 py-2.5 rounded-full font-semibold text-sm transition-all hover:bg-[#ED0407]/90"
+                        : "text-white/80 hover:text-white transition-colors duration-100 font-medium text-sm tracking-wider"
+                    }
+                    whileHover={link.isButton ? { scale: 1.02 } : { y: -2, transition: { duration: 0.12 } }}
                   >
                     {link.name}
                   </motion.a>

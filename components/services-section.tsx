@@ -5,8 +5,8 @@ import { ServiceCard } from "./service-card"
 
 export const services = [
   {
-    id: "express-wash",
-    title: "Express Wash",
+    id: "essentail-wash",
+    title: "Essentail Wash",
     description:
       "A quick, high-quality exterior wash that strips away dirt and buildup, delivering a crisp, spotless finish. (35 mins)",
     price: "₱200",
@@ -21,10 +21,10 @@ export const services = [
     duration: "35 mins",
     durationMinutes: 35,
     canUpgradeTo: [
-      "express-full-detail",
-      "deluxe-detail",
-      "premium-detail",
-      "executive-detail",
+      "premium-wash",
+      "bronze-pack",
+      "silver-pack",
+      "gold-pack",
       "paint-correction",
       "ceramic-coating-3yr",
       "ceramic-coating-5yr",
@@ -33,7 +33,6 @@ export const services = [
     features: [
       "Premium body wash (Foam-Rinse-Foam)",
       "Streak-free cleaning of windows & mirrors",
-      "Window & mirror polish",
       "Door jambs wiped down",
       "Microfiber towel and air dry",
       "Vacuum",
@@ -41,8 +40,8 @@ export const services = [
     ],
   },
   {
-    id: "express-full-detail",
-    title: "Express Full Wash",
+    id: "premium-wash",
+    title: "Premium Wash",
     description:
       "A complete interior and exterior cleaning in one visit-designed to quickly restore your vehicle's overall cleanliness inside and out. (1 hr)",
     price: "₱500",
@@ -57,16 +56,16 @@ export const services = [
     duration: "1 hr",
     durationMinutes: 60,
     canUpgradeTo: [
-      "deluxe-detail",
-      "premium-detail",
-      "executive-detail",
+      "bronze-pack",
+      "silver-pack",
+      "gold-pack",
       "paint-correction",
       "ceramic-coating-3yr",
       "ceramic-coating-5yr",
     ],
     image: "/images/interior-detailing.jpg",
     features: [
-      "All Express Wash",
+      "All Essentail Wash",
       "Deluxe Interior Detail",
       "Interior Dressing",
       "Trim Restoration",
@@ -74,25 +73,25 @@ export const services = [
     ],
   },
   {
-    id: "deluxe-detail",
-    title: "Deluxe Detail",
+    id: "bronze-pack",
+    title: "Bronze Pack",
     description:
       "Upgrade to full detail with interior and exterior cleaning in one visit. (1 hr)",
-    price: "₱675",
-    priceValue: 675,
+    price: "₱1,350",
+    priceValue: 1350,
     prices: {
-      "Compact/Hatch": 675,
-      "Sedan Type": 795,
-      "APV/AUV": 950,
-      "SUV/Pick-up": 1095,
-      "Lifted/Van/L300": 1250,
+      "Compact/Hatch": 1350,
+      "Sedan Type": 1590,
+      "APV/AUV": 1900,
+      "SUV/Pick-up": 2190,
+      "Lifted/Van/L300": 2500,
     },
     duration: "1 hr",
     durationMinutes: 60,
-    canUpgradeTo: ["premium-detail", "executive-detail", "paint-correction", "ceramic-coating-3yr", "ceramic-coating-5yr"],
+    canUpgradeTo: ["silver-pack", "gold-pack", "paint-correction", "ceramic-coating-3yr", "ceramic-coating-5yr"],
     image: "/images/shop-deluxe-detail.jpeg",
     features: [
-      "All Express Wash",
+      "All Essentail Wash",
       "Interior Dressing",
       "Back to Zero Sanitation",
       "Trim Restoration",
@@ -102,25 +101,25 @@ export const services = [
     ],
   },
   {
-    id: "premium-detail",
-    title: "Premium Detail",
+    id: "silver-pack",
+    title: "Silver Pack",
     description:
       "Advanced detailing package with stronger decontamination and enhanced finish. (1 hr 20 mins)",
-    price: "₱925",
-    priceValue: 925,
+    price: "₱1,850",
+    priceValue: 1850,
     prices: {
-      "Compact/Hatch": 925,
-      "Sedan Type": 1095,
-      "APV/AUV": 1300,
-      "SUV/Pick-up": 1495,
-      "Lifted/Van/L300": 1700,
+      "Compact/Hatch": 1850,
+      "Sedan Type": 2190,
+      "APV/AUV": 2600,
+      "SUV/Pick-up": 2990,
+      "Lifted/Van/L300": 3400,
     },
     duration: "1 hr 20 mins",
     durationMinutes: 80,
-    canUpgradeTo: ["executive-detail", "ceramic-coating-3yr", "ceramic-coating-5yr"],
+    canUpgradeTo: ["gold-pack", "paint-correction", "ceramic-coating-3yr", "ceramic-coating-5yr"],
     image: "/images/shop-premium-detail.jpeg",
     features: [
-      "All Express Wash",
+      "All Essentail Wash",
       "Interior Dressing",
       "Back to Zero Sanitation",
       "Trim Restoration",
@@ -131,25 +130,25 @@ export const services = [
     ],
   },
   {
-    id: "executive-detail",
-    title: "Executive Detail",
+    id: "gold-pack",
+    title: "Gold Pack",
     description:
       "High-level detailing package with deeper interior and exterior restoration. (1 hr 45 mins)",
-    price: "₱1,175",
-    priceValue: 1175,
+    price: "₱2,350",
+    priceValue: 2350,
     prices: {
-      "Compact/Hatch": 1175,
-      "Sedan Type": 1370,
-      "APV/AUV": 1600,
-      "SUV/Pick-up": 1820,
-      "Lifted/Van/L300": 2050,
+      "Compact/Hatch": 2350,
+      "Sedan Type": 2740,
+      "APV/AUV": 3200,
+      "SUV/Pick-up": 3640,
+      "Lifted/Van/L300": 4100,
     },
     duration: "1 hr 45 mins",
     durationMinutes: 105,
     canUpgradeTo: ["paint-correction", "ceramic-coating-3yr", "ceramic-coating-5yr"],
     image: "/images/engine-wash.jpg",
     features: [
-      "All Express Wash",
+      "All Essentail Wash",
       "Interior Dressing",
       "Back to Zero Sanitation",
       "Trim Restoration",
@@ -285,6 +284,7 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
           {mainServices.map((service, index) => (
             <ServiceCard
               key={service.id}
+              id={service.id}
               title={service.title}
               description={service.description}
               price={service.price}
@@ -302,6 +302,7 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
           {ceramicServices.map((service, idx) => (
             <ServiceCard
               key={service.id}
+              id={service.id}
               title={service.title}
               description={service.description}
               price={service.price}

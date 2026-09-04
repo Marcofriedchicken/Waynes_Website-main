@@ -8,6 +8,7 @@ import { ServicesSection } from "@/components/services-section"
 import { WhyChooseUs } from "@/components/why-choose-us"
 import { ShopSection } from "@/components/shop-section"
 import { ReviewsSection } from "@/components/reviews-section"
+import { FindUsSection } from "@/components/find-us-section"
 import { ContactSection } from "@/components/contact-section"
 import { Footer } from "@/components/footer"
 import { BookingModal } from "@/components/booking-modal"
@@ -38,6 +39,7 @@ export default function Home() {
         <WhyChooseUs />
         <ShopSection />
         <ReviewsSection />
+        <FindUsSection />
         <ContactSection onBookNow={() => openBooking()} />
         <Footer />
         

@@ -57,7 +57,7 @@ export function Footer() {
               className="h-16 w-auto object-contain mb-4"
             />
             <p className="text-white/60 text-sm mb-4">
-              Premium auto detailing services in Marikina City. We bring out the best in your vehicle.
+              Premium auto detailing services in Pasig City. We bring out the best in your vehicle.
             </p>
           </div>
 
@@ -101,8 +101,8 @@ export function Footer() {
           <div>
             <h3 className="text-white font-bold text-lg mb-4">Contact Us</h3>
             <div className="space-y-2 text-sm text-white/60">
-              <p>No.9 Mount Vernon St,</p>
-              <p>Brgy Sta. Elena, Marikina City</p>
+              <p>201 Mercedes Ave,</p>
+              <p>San Miguel, Pasig, 1600 Metro Manila</p>
               <p className="pt-2">
                 <button onClick={openModal} className="hover:text-[#D4A843] transition-colors">
                   0917-376-3348

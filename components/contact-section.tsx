@@ -50,8 +50,8 @@ export function ContactSection({ onBookNow }: ContactSectionProps) {
               <div>
                 <h3 className="text-white font-bold text-lg mb-1">Location</h3>
                 <p className="text-white/60">
-                  No.9 Mount Vernon St,<br />
-                  Brgy Sta. Elena, Marikina City
+                  201 Mercedes Ave,<br />
+                  San Miguel, Pasig, 1600 Metro Manila
                 </p>
               </div>
             </div>
@@ -90,7 +90,7 @@ export function ContactSection({ onBookNow }: ContactSectionProps) {
               <div>
                 <h3 className="text-white font-bold text-lg mb-1">Business Hours</h3>
                 <p className="text-white/60">
-                  Daily: 7:00 AM – 8:00 PM
+                  Daily: 7:00 AM – 7:00 PM
                 </p>
               </div>
             </div>
