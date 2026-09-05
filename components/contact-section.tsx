@@ -1,8 +1,17 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { MapPin, Phone, Mail, Clock, Facebook, Instagram, MessageCircle } from "lucide-react"
+import { MapPin, Phone, Mail, Clock, Facebook, Instagram } from "lucide-react"
 import { useContactModal } from "@/hooks/use-contact-modal"
+
+function TikTokIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
+      <path d="M14 3c.7 2 2 3.2 4.2 3.6v2.7c-1.2 0-2.4-.3-3.5-.9v6.3a4.6 4.6 0 1 1-4.6-4.6c.3 0 .6 0 .8.1v2.7a2 2 0 1 0 1.2 1.9V3h2z" />
+      <path d="M14 3h2.5a5.6 5.6 0 0 0 5.5 5.5v2.7a8.3 8.3 0 0 1-5.5-1.8V3z" />
+    </svg>
+  )
+}
 
 interface ContactSectionProps {
   onBookNow: () => void
@@ -124,7 +133,7 @@ export function ContactSection({ onBookNow }: ContactSectionProps) {
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <MessageCircle className="w-5 h-5" />
+                <TikTokIcon className="w-5 h-5" />
               </motion.a>
             </div>
           </motion.div>

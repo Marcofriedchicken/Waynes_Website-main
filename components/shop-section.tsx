@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion"
 import Image from "next/image"
-import { ShoppingBag } from "lucide-react"
 
 export const merchandise = [
   {
@@ -133,23 +132,12 @@ export function ShopSection() {
                   {item.description}
                 </p>
 
-                {/* Price and Button */}
-                <div className="flex items-center justify-between">
-                  <span className="text-[#D4A843] font-bold text-xl">{item.price}</span>
-                  <motion.button
-                    className="flex items-center gap-2 bg-[#ED0407] hover:bg-[#ED0407]/90 text-white px-4 py-2 rounded-md font-bold text-xs transition-all"
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <ShoppingBag className="w-4 h-4" />
-                    ADD
-                  </motion.button>
-                </div>
+                <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
               </div>
             </motion.div>
           ))}
         </div>
 
-        {/* Coming Soon Notice */}
         <motion.div
           className="mt-12 text-center"
           initial={{ opacity: 0, y: 20 }}
@@ -157,8 +145,8 @@ export function ShopSection() {
           transition={{ duration: 0.6, delay: 0.4 }}
           viewport={{ once: true }}
         >
-          <p className="text-white/40 text-sm">
-            More products coming soon! Follow us on social media for updates.
+          <p className="text-white/70 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+            Shop our official gear or collect it in person at the studio for a premium detailing experience and a brand you can rep with pride.
           </p>
         </motion.div>
       </div>

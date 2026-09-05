@@ -192,12 +192,12 @@ export function ServiceCard({
                 style={{
                   color: (hovered || active)
                     ? (() => {
-                        if (title.toLowerCase().includes("essential") || title.toLowerCase().includes("essentail")) return goldColor
+                        if (title.toLowerCase().includes("essential")) return goldColor
                         if (title.toLowerCase().includes("paint")) return "#B7FF5A"
                         return cardColor ?? goldColor
                       })()
                     : undefined,
-                  textShadow: (hovered || active) && (title.toLowerCase().includes("paint") || title.toLowerCase().includes("essential") || title.toLowerCase().includes("essentail"))
+                  textShadow: (hovered || active) && (title.toLowerCase().includes("paint") || title.toLowerCase().includes("essential"))
                     ? "0 0 12px rgba(255,255,255,0.2)"
                     : undefined,
                 }}

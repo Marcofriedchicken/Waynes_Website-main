@@ -5,8 +5,8 @@ import { ServiceCard } from "./service-card"
 
 export const services = [
   {
-    id: "essentail-wash",
-    title: "Essentail Wash",
+    id: "essential-wash",
+    title: "Essential Wash",
     description:
       "A quick, high-quality exterior wash that strips away dirt and buildup, delivering a crisp, spotless finish. (35 mins)",
     price: "₱200",
@@ -65,7 +65,7 @@ export const services = [
     ],
     image: "/images/interior-detailing.jpg",
     features: [
-      "All Essentail Wash",
+      "All Essential Wash",
       "Deluxe Interior Detail",
       "Interior Dressing",
       "Trim Restoration",
@@ -91,7 +91,7 @@ export const services = [
     canUpgradeTo: ["silver-pack", "gold-pack", "paint-correction", "ceramic-coating-3yr", "ceramic-coating-5yr"],
     image: "/images/shop-deluxe-detail.jpeg",
     features: [
-      "All Essentail Wash",
+      "All Essential Wash",
       "Interior Dressing",
       "Back to Zero Sanitation",
       "Trim Restoration",
@@ -119,7 +119,7 @@ export const services = [
     canUpgradeTo: ["gold-pack", "paint-correction", "ceramic-coating-3yr", "ceramic-coating-5yr"],
     image: "/images/shop-premium-detail.jpeg",
     features: [
-      "All Essentail Wash",
+      "All Essential Wash",
       "Interior Dressing",
       "Back to Zero Sanitation",
       "Trim Restoration",
@@ -148,7 +148,7 @@ export const services = [
     canUpgradeTo: ["paint-correction", "ceramic-coating-3yr", "ceramic-coating-5yr"],
     image: "/images/engine-wash.jpg",
     features: [
-      "All Essentail Wash",
+      "All Essential Wash",
       "Interior Dressing",
       "Back to Zero Sanitation",
       "Trim Restoration",
@@ -249,7 +249,7 @@ interface ServicesSectionProps {
 }
 
 export function ServicesSection({ onBookService }: ServicesSectionProps) {
-  const firstRowServices = services.filter((s) => ["essentail-wash", "premium-wash"].includes(s.id))
+  const firstRowServices = services.filter((s) => ["essential-wash", "premium-wash"].includes(s.id))
   const secondRowServices = services.filter((s) => ["bronze-pack", "silver-pack", "gold-pack"].includes(s.id))
   const thirdRowServices = services.filter((s) =>
     ["paint-correction", "ceramic-coating-3yr", "ceramic-coating-5yr"].includes(s.id),
@@ -270,7 +270,7 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
             What We Offer
           </span>
           <h2 className="text-4xl md:text-5xl font-black text-white mt-4 mb-4">
-            Our <span className="text-[#ED0407]">Premium</span> Services
+            Choose Your <span className="text-[#ED0407]">Auto Care</span> Package
           </h2>
           <p className="text-white/50 max-w-2xl mx-auto">
             From basic washes to complete transformations, we offer a full range of
