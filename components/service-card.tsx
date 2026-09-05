@@ -33,6 +33,7 @@ export function ServiceCard({
     "bronze-pack": "#B9773D",
     "silver-pack": "#C0C0C0",
     "gold-pack": "#D4A843",
+    "paint-correction": "#B7FF5A",
     "diamond-ceramic": "#B9F2FF",
     "ceramic-coating-3yr": "#B9F2FF",
     "titanium-ceramic-shield": "#9CA3AF",
@@ -57,6 +58,39 @@ export function ServiceCard({
   const normalizedTitleId = title.toLowerCase().replace(/\s+/g, "-")
   const isGoldBullet = goldBulletIds.has(lookup) || goldBulletIds.has(normalizedTitleId)
 
+  const metallicGradients: Record<string, string> = {
+    bronze: "linear-gradient(135deg, #fff4d6 0%, #f1c17b 18%, #d8933d 35%, #ffe6a7 52%, #9d5d1a 72%, #f7dfb0 100%)",
+    silver: "linear-gradient(135deg, #ffffff 0%, #edf3f8 18%, #bec7d2 32%, #ffffff 48%, #8a98a8 62%, #ecf1f7 78%, #d9e0e8 100%)",
+    gold: "linear-gradient(135deg, #fff9d8 0%, #fce9a6 18%, #d8b14c 35%, #fff4b0 52%, #b67d1a 70%, #f6d86a 100%)",
+    paint: "linear-gradient(135deg, #f8ffe7 0%, #d7ff7a 18%, #b7ff5a 36%, #dfff94 52%, #6de82e 72%, #ecffd4 100%)",
+    diamond: "linear-gradient(135deg, #f7ffff 0%, #dff7ff 18%, #9fe6ff 35%, #f7ffff 52%, #5dc7f4 70%, #dffcff 100%)",
+    titanium: "linear-gradient(135deg, #ffffff 0%, #dfe8ef 18%, #aab8c9 35%, #f7fafc 52%, #7c8ca0 70%, #edf3f8 100%)",
+  }
+
+  const getPaintCorrectionTextStyle = () => ({
+    color: (hovered || active) ? "#B7FF5A" : undefined,
+    textShadow: (hovered || active) ? "0 0 16px rgba(183,255,90,0.9)" : undefined,
+  })
+
+  const getMetallicTextStyle = (keyword: string) => {
+    const activeGlow = hovered || active
+    const gradient = metallicGradients[keyword] || metallicGradients.silver
+
+    if (!activeGlow) {
+      return {}
+    }
+
+    return {
+      backgroundImage: gradient,
+      backgroundClip: "text",
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      color: "transparent",
+      textShadow: `0 0 16px ${cardColor ?? "#ffffff"}99`,
+      filter: "brightness(1.25)",
+    } as React.CSSProperties
+  }
+
   // Color only the keyword word within the title if present (Bronze/Silver/Gold/Diamond/Titanium)
   const keywords = ["bronze", "silver", "gold", "diamond", "titanium"]
   let titleNode: React.ReactNode = title
@@ -67,18 +101,30 @@ export function ServiceCard({
       const before = title.slice(0, idx)
       const match = title.slice(idx, idx + kw.length)
       const after = title.slice(idx + kw.length)
-      // if hovered or active, color the remainder as well for the affected cards
-      const shouldColor = cardColor && (hovered || active)
-      const afterColor = shouldColor ? cardColor : undefined
+      const shouldColor = Boolean(cardColor) && (hovered || active)
+      const keywordStyle = shouldColor ? getMetallicTextStyle(kw) : {}
+      const afterStyle = shouldColor ? getMetallicTextStyle(kw) : {}
       titleNode = (
         <>
           {before}
-          <span style={{ color: shouldColor ? cardColor : undefined }}>{match}</span>
-          <span style={{ color: afterColor }}>{after}</span>
+          <span style={keywordStyle}>{match}</span>
+          <span style={afterStyle}>{after}</span>
         </>
       )
       break
     }
+  }
+
+  if (title.toLowerCase().includes("paint")) {
+    const paintIndex = title.toLowerCase().indexOf("paint")
+    const before = title.slice(0, paintIndex)
+    const match = title.slice(paintIndex)
+    titleNode = (
+      <>
+        {before}
+        <span style={getPaintCorrectionTextStyle()}>{match}</span>
+      </>
+    )
   }
   return (
     <motion.div
@@ -93,7 +139,9 @@ export function ServiceCard({
       onClick={() => setActive((v) => !v)}
       style={{
         boxShadow: "0 0 0 1px rgba(42, 42, 42, 1)",
+        ...(cardColor ? ({ ['--special-color']: cardColor } as React.CSSProperties) : {}),
       }}
+      data-active={active}
     >
       {/* colored glow border on hover for specific cards */}
       <div
@@ -142,7 +190,16 @@ export function ServiceCard({
               <span
                 className="mt-1 flex-shrink-0 transition-colors duration-100 ease-out"
                 style={{
-                  color: (hovered || active) ? (isGoldBullet ? goldColor : cardColor) : undefined,
+                  color: (hovered || active)
+                    ? (() => {
+                        if (title.toLowerCase().includes("essential") || title.toLowerCase().includes("essentail")) return goldColor
+                        if (title.toLowerCase().includes("paint")) return "#B7FF5A"
+                        return cardColor ?? goldColor
+                      })()
+                    : undefined,
+                  textShadow: (hovered || active) && (title.toLowerCase().includes("paint") || title.toLowerCase().includes("essential") || title.toLowerCase().includes("essentail"))
+                    ? "0 0 12px rgba(255,255,255,0.2)"
+                    : undefined,
                 }}
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">

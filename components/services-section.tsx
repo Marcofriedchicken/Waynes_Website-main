@@ -249,12 +249,11 @@ interface ServicesSectionProps {
 }
 
 export function ServicesSection({ onBookService }: ServicesSectionProps) {
-  // Show non-ceramic services sorted by ascending base price (low -> high)
-  const mainServices = services
-    .filter((s) => !CERAMIC_SERVICE_IDS.has(s.id))
-    .slice()
-    .sort((a, b) => (a.priceValue || 0) - (b.priceValue || 0))
-  const ceramicServices = services.filter((s) => CERAMIC_SERVICE_IDS.has(s.id))
+  const firstRowServices = services.filter((s) => ["essentail-wash", "premium-wash"].includes(s.id))
+  const secondRowServices = services.filter((s) => ["bronze-pack", "silver-pack", "gold-pack"].includes(s.id))
+  const thirdRowServices = services.filter((s) =>
+    ["paint-correction", "ceramic-coating-3yr", "ceramic-coating-5yr"].includes(s.id),
+  )
 
   return (
     <section id="services" className="py-24 bg-[#0A0A0A]">
@@ -280,8 +279,8 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
         </motion.div>
 
         {/* Services Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {mainServices.map((service, index) => (
+        <div className="mx-auto mb-8 grid max-w-5xl grid-cols-1 gap-8 md:grid-cols-2">
+          {firstRowServices.map((service, index) => (
             <ServiceCard
               key={service.id}
               id={service.id}
@@ -297,9 +296,8 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
           ))}
         </div>
 
-        {/* Ceramic coating pair — centered */}
-        <div className="mx-auto mt-10 grid max-w-5xl grid-cols-1 gap-8 sm:grid-cols-2 sm:justify-items-stretch">
-          {ceramicServices.map((service, idx) => (
+        <div className="mx-auto mb-8 grid max-w-6xl grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
+          {secondRowServices.map((service, index) => (
             <ServiceCard
               key={service.id}
               id={service.id}
@@ -310,7 +308,24 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
               image={service.image}
               features={service.features}
               onBook={() => onBookService(service.id)}
-              index={mainServices.length + idx}
+              index={firstRowServices.length + index}
+            />
+          ))}
+        </div>
+
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
+          {thirdRowServices.map((service, index) => (
+            <ServiceCard
+              key={service.id}
+              id={service.id}
+              title={service.title}
+              description={service.description}
+              price={service.price}
+              duration={service.duration}
+              image={service.image}
+              features={service.features}
+              onBook={() => onBookService(service.id)}
+              index={firstRowServices.length + secondRowServices.length + index}
             />
           ))}
         </div>

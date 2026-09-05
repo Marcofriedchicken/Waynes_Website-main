@@ -139,3 +139,15 @@
 .special-glow {
   transition: box-shadow 220ms ease, opacity 180ms ease, transform 220ms ease;
 }
+
+/* Use the --special-color variable from the card to draw the glow via CSS
+   This ensures hover glow appears when CSS :hover (group-hover) is triggered
+   even if JS onMouseEnter doesn't run (e.g., some touch/edge cases). */
+.special-card .special-glow {
+  box-shadow: var(--special-color, rgba(212,168,67)) 0 0 28px 0.5px, rgba(0,0,0,0.08) 0 0 48px 0;
+}
+.special-card:hover .special-glow,
+.special-card[data-active="true"] .special-glow {
+  opacity: 1;
+  box-shadow: 0 0 48px var(--special-color, #D4A843)88, 0 0 88px var(--special-color, #D4A843)55, inset 0 0 0 2px var(--special-color, #D4A843);
+}
