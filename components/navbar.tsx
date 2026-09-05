@@ -85,11 +85,11 @@ export function Navbar({ onBookNow }: NavbarProps) {
           <div className="relative flex items-center justify-between h-24">
             <div className="hidden md:block w-10" />
 
-            {/* Logo */}
+            {/* Logo (desktop centered). On mobile we'll render a compact row instead. */}
             <motion.a
               href="#home"
               onClick={(e) => handleNavClick(e, "#home")}
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 md:static md:translate-x-0 md:translate-y-0"
+              className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:static"
               whileHover={{ scale: 1.02 }}
             >
               <Logo className="flex flex-col items-center" />
@@ -135,13 +135,26 @@ export function Navbar({ onBookNow }: NavbarProps) {
               </motion.button>
             </div>
 
-            {/* Mobile Menu Button */}
-            <button
-              className="md:hidden text-white p-2"
-              onClick={() => setIsOpen(!isOpen)}
-            >
-              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+            {/* Mobile compact row: left logo, center phone, right menu */}
+            <div className="md:hidden flex items-center justify-between w-full px-4">
+              <div className="flex items-center">
+                <Logo className="flex items-center" />
+              </div>
+              <button
+                onClick={openModal}
+                className="text-white/90 hover:text-white transition-colors text-sm px-2"
+                aria-label="Call Wayne's Detailing"
+              >
+                0917-376-3348
+              </button>
+              <button
+                className="text-white p-2"
+                onClick={() => setIsOpen(!isOpen)}
+                aria-label="Open menu"
+              >
+                {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+              </button>
+            </div>
           </div>
         </div>
 

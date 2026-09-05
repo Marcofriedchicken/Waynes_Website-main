@@ -4,7 +4,7 @@ const POOLS = {
   A: {
     id: 'A',
     capacity: 3,
-    services: ['Essentail Wash', 'Premium Wash', 'Bronze Pack', 'Silver Pack', 'Gold Pack', 'Elite Detail'],
+    services: ['Essential Wash', 'Premium Wash', 'Bronze Pack', 'Silver Pack', 'Gold Pack', 'Elite Detail'],
   },
   B: {
     id: 'B',

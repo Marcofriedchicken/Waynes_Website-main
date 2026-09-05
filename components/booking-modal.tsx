@@ -283,7 +283,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
 
   const selectedAddOnsData = addOns.filter((addon) => selectedAddOns.includes(addon.id))
   const addOnVisibilityByService: Record<string, string[]> = {
-    "essentail-wash": [
+    "essential-wash": [
       "headlight-restoration",
       "engine-bay-cleaning",
       "back-to-zero",

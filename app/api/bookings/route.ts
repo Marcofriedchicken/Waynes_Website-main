@@ -63,7 +63,7 @@ function formatDuration(minutes: number) {
 }
 
 const SERVICE_DURATIONS: Record<string, number> = {
-  "Essentail Wash": 35,
+  "Essential Wash": 35,
   "Premium Wash": 60,
   "Bronze Pack": 60,
   "Silver Pack": 80,
@@ -154,7 +154,7 @@ async function syncToHubSpot(payload: BookingPayload) {
 
     // Create deal
     const serviceMap: Record<string, string> = {
-  'Essentail Wash': 'essentail_wash',
+  'Essential Wash': 'essential_wash',
   'Premium Wash': 'premium_wash',
   'Bronze Pack': 'bronze_pack',
   'Silver Pack': 'silver_pack',

@@ -11,7 +11,7 @@ export const POOLS = {
     id: "A",
     capacity: 3,
     services: [
-      "Essentail Wash",
+      "Essential Wash",
       "Premium Wash",
       "Bronze Pack",
       "Silver Pack",
@@ -42,7 +42,7 @@ export const ADDON_DURATIONS: Record<string, number> = {
 }
 
 export const SERVICE_DURATIONS: Record<string, number> = {
-  "Essentail Wash": 35,
+  "Essential Wash": 35,
   "Premium Wash": 60,
   "Bronze Pack": 60,
   "Silver Pack": 80,
