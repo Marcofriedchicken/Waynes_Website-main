@@ -118,11 +118,15 @@ export async function GET() {
     const addOns: AddOn[] = addOnsRes.data || []
     const shopItems: ShopItem[] = shopItemsRes.data || []
     const promotions: Promotion[] = promosRes.data || []
+    const siteWidePromos = promotions.filter(p => !p.service_id && !p.add_on_id && !p.shop_item_id)
 
     // Build service pricing structure
     const servicesWithPrices = services.map(service => {
       const servicePrices = prices.filter(p => p.service_id === service.id)
-      const servicePromos = promotions.filter(p => p.service_id === service.id)
+      const servicePromos = [
+        ...promotions.filter(p => p.service_id === service.id),
+        ...siteWidePromos,
+      ]
 
       const vehicleTypesPricing: Record<string, { price: number; effective_price: number; active_promo_label: string | null }> = {}
 
@@ -164,7 +168,10 @@ export async function GET() {
 
     // Build add-ons with promo pricing
     const addOnsWithPricing = addOns.map(addon => {
-      const addonPromos = promotions.filter(p => p.add_on_id === addon.id)
+      const addonPromos = [
+        ...promotions.filter(p => p.add_on_id === addon.id),
+        ...siteWidePromos,
+      ]
       const { promo, discount } = findBestPromo(addonPromos, now, addon.price)
       const effective_price = Math.max(0, addon.price - discount)
 
@@ -185,7 +192,10 @@ export async function GET() {
 
     // Build shop items with promo pricing
     const shopItemsWithPricing = shopItems.map(item => {
-      const itemPromos = promotions.filter(p => p.shop_item_id === item.id)
+      const itemPromos = [
+        ...promotions.filter(p => p.shop_item_id === item.id),
+        ...siteWidePromos,
+      ]
       const { promo, discount } = findBestPromo(itemPromos, now, item.price)
       const effective_price = Math.max(0, item.price - discount)
 
@@ -203,9 +213,6 @@ export async function GET() {
         promo_end_date: promo?.end_date || null,
       }
     })
-
-    // Check for site-wide promos and apply to all items if applicable
-    const siteWidePromos = promotions.filter(p => !p.service_id && !p.add_on_id && !p.shop_item_id)
 
     // Return response with cache headers (60 seconds)
     const response = NextResponse.json({
