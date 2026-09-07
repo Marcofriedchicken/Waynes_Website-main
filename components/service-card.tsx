@@ -22,6 +22,15 @@ interface ServiceCardProps {
   promoEndDate?: string | null
 }
 
+function withHexAlpha(color: string, alpha: string) {
+  if (/^#[0-9a-fA-F]{6}$/.test(color)) return `${color}${alpha}`
+  if (/^#[0-9a-fA-F]{3}$/.test(color)) {
+    const expanded = color.slice(1).split("").map((digit) => digit + digit).join("")
+    return `#${expanded}${alpha}`
+  }
+  return color
+}
+
 function formatPromoEndDate(endDate?: string | null) {
   if (!endDate) return ""
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(endDate))
@@ -153,7 +162,13 @@ export function ServiceCard({
       onClick={() => setActive((v) => !v)}
       style={{
         boxShadow: "0 0 0 1px rgba(42, 42, 42, 1)",
-        ...(cardColor ? ({ ['--special-color']: cardColor } as React.CSSProperties) : {}),
+        ...(cardColor
+          ? ({
+              "--special-color": cardColor,
+              "--special-color-88": withHexAlpha(cardColor, "88"),
+              "--special-color-55": withHexAlpha(cardColor, "55"),
+            } as React.CSSProperties)
+          : {}),
       }}
       data-active={active}
     >
