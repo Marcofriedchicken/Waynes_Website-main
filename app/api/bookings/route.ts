@@ -98,11 +98,57 @@ function getAddonDuration(addonName: string): number {
   return ADDON_DURATIONS[normalized] || 0
 }
 
+async function calculateRealPrices(
+  serviceTitle: string,
+  vehicleType: string,
+  addonNames: string[]
+) {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+    const res = await fetch(`${baseUrl}/api/pricing`, { cache: "no-store" })
+    const pricingData = await res.json()
+
+    // Find the service
+    const service = pricingData.services.find(
+      (s: any) => s.name === serviceTitle
+    )
+    if (!service) {
+      throw new Error(`Service not found: ${serviceTitle}`)
+    }
+
+    // Get service price for vehicle type
+    const servicePricing = service.prices[vehicleType]
+    if (!servicePricing) {
+      throw new Error(`Vehicle type not found for service: ${vehicleType}`)
+    }
+    const servicePrice = servicePricing.effective_price
+
+    // Get addon prices
+    let totalAddonPrice = 0
+    for (const addonName of addonNames) {
+      const addon = pricingData.addOns.find((a: any) => a.name === addonName)
+      if (addon) {
+        totalAddonPrice += addon.effective_price
+      }
+    }
+
+    return {
+      servicePrice,
+      totalAddonPrice,
+      totalAmount: servicePrice + totalAddonPrice,
+    }
+  } catch (err) {
+    console.error("Error calculating real prices:", err)
+    // Fall back to client values if pricing fails
+    return null
+  }
+}
+
 function overlaps(startA: string, endA: string, startB: string, endB: string) {
   return startA < endB && endA > startB
 }
 
-async function syncToHubSpot(payload: BookingPayload) {
+async function syncToHubSpot(payload: BookingPayload, totalAmount = payload.totalAmount) {
   try {
     const token = process.env.HUBSPOT_ACCESS_TOKEN
     if (!token) return
@@ -170,7 +216,7 @@ async function syncToHubSpot(payload: BookingPayload) {
       body: JSON.stringify({
         properties: {
           dealname: `${payload.customerName} — ${payload.serviceTitle}`,
-          amount: payload.totalAmount,
+          amount: totalAmount,
           dealstage: 'appointmentscheduled',
           pipeline: 'default',
           customer_name: payload.customerName,
@@ -216,6 +262,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required booking fields." }, { status: 400 })
     }
 
+    // Calculate real prices server-side
+    const addonNames = payload.addons.map((a) => a.name)
+    const calculatedPrices = await calculateRealPrices(
+      payload.serviceTitle,
+      payload.vehicle.type,
+      addonNames
+    )
+
+    // Use calculated prices if available, otherwise use payload values (with warning)
+    let finalServicePrice = payload.serviceBasePrice
+    let finalTotalAmount = payload.totalAmount
+
+    if (calculatedPrices) {
+      finalServicePrice = calculatedPrices.servicePrice
+      finalTotalAmount = calculatedPrices.totalAmount
+    } else {
+      console.warn(
+        `Could not calculate real prices, using client values for booking: ${payload.serviceTitle}`
+      )
+    }
     const {
       SMTP_HOST,
       SMTP_PORT,
@@ -257,7 +323,7 @@ export async function POST(request: Request) {
       `Schedule: ${slotLabel}`,
       `Estimated Duration: ${durationLabel}`,
       payload.overnight ? `Overnight booking: Vehicle ready next day.` : null,
-      `Total Amount: ${currency(payload.totalAmount)}`,
+      `Total Amount: ${currency(finalTotalAmount)}`,
     ].join("\n")
 
     const resolvedLogoUrl = BUSINESS_LOGO_URL || defaultLogoUrl
@@ -300,7 +366,7 @@ export async function POST(request: Request) {
               <p style="margin:0 0 8px;"><strong style="color:#FFFFFF;">Schedule:</strong> ${slotLabel}</p>
               <p style="margin:0 0 8px;"><strong style="color:#FFFFFF;">Estimated Time:</strong> ${durationLabel}</p>
               ${payload.overnight ? `<div style="margin:8px 0; padding:10px; border-radius:8px; background:#FFF8E1; color:#6B4A00;">Your vehicle will be ready for pickup the following day. Our team will contact you to confirm your pickup time.</div>` : ""}
-              <p style="margin:0; color:#D4A843; font-size:18px; font-weight:800;"><strong>Total:</strong> ${currency(payload.totalAmount)}</p>
+              <p style="margin:0; color:#D4A843; font-size:18px; font-weight:800;"><strong>Total:</strong> ${currency(finalTotalAmount)}</p>
             </div>
       ${emailShellEnd}
     `
@@ -321,7 +387,7 @@ export async function POST(request: Request) {
               <p style="margin:0 0 8px;"><strong style="color:#FFFFFF;">Schedule:</strong> ${slotLabel}</p>
               <p style="margin:0 0 8px;"><strong style="color:#FFFFFF;">Estimated Time:</strong> ${durationLabel}</p>
               ${payload.overnight ? `<div style="margin:8px 0; padding:10px; border-radius:8px; background:#FFF8E1; color:#6B4A00;">Overnight booking — vehicle will be ready next day.</div>` : ""}
-              <p style="margin:0; color:#D4A843; font-size:18px; font-weight:800;"><strong>Total:</strong> ${currency(payload.totalAmount)}</p>
+              <p style="margin:0; color:#D4A843; font-size:18px; font-weight:800;"><strong>Total:</strong> ${currency(finalTotalAmount)}</p>
             </div>
       ${emailShellEnd}
     `
@@ -461,14 +527,14 @@ export async function POST(request: Request) {
             customerPhone: payload.customerPhone,
             service: payload.serviceTitle,
             addons: formatAddons(payload.addons),
-            totalAmount: `PHP ${payload.totalAmount.toLocaleString()}`,
+          totalAmount: `PHP ${finalTotalAmount.toLocaleString()}`,
             vehicle: formatVehicle(payload.vehicle),
             appointmentDate: formatAppointmentDate(payload.appointmentDate),
             appointmentTime: formatAppointmentTime(payload.appointmentTime),
           })
         }
 
-        await syncToHubSpot(payload)
+        await syncToHubSpot(payload, finalTotalAmount)
 
         return NextResponse.json({ ok: true, emailSent, ownerEmailSent, emailProvider: "resend", eventLink })
       } catch (resendError) {
@@ -527,14 +593,14 @@ export async function POST(request: Request) {
             customerPhone: payload.customerPhone,
             service: payload.serviceTitle,
             addons: formatAddons(payload.addons),
-            totalAmount: `PHP ${payload.totalAmount.toLocaleString()}`,
+            totalAmount: `PHP ${finalTotalAmount.toLocaleString()}`,
             vehicle: formatVehicle(payload.vehicle),
             appointmentDate: formatAppointmentDate(payload.appointmentDate),
             appointmentTime: formatAppointmentTime(payload.appointmentTime),
           })
         }
 
-        await syncToHubSpot(payload)
+        await syncToHubSpot(payload, finalTotalAmount)
 
         return NextResponse.json({ ok: true, emailSent: true, ownerEmailSent, emailProvider: "smtp", eventLink })
       } catch (smtpError) {
@@ -555,14 +621,14 @@ export async function POST(request: Request) {
         customerPhone: payload.customerPhone,
         service: payload.serviceTitle,
         addons: formatAddons(payload.addons),
-        totalAmount: `PHP ${payload.totalAmount.toLocaleString()}`,
+        totalAmount: `PHP ${finalTotalAmount.toLocaleString()}`,
         vehicle: formatVehicle(payload.vehicle),
         appointmentDate: formatAppointmentDate(payload.appointmentDate),
         appointmentTime: formatAppointmentTime(payload.appointmentTime),
       })
     }
 
-    await syncToHubSpot(payload)
+    await syncToHubSpot(payload, finalTotalAmount)
 
     return NextResponse.json({
       ok: true,

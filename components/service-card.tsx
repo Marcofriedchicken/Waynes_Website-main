@@ -3,6 +3,7 @@
 import React, { useState } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
+import { PromoRibbon } from "./promo-ribbon"
 
 interface ServiceCardProps {
   id?: string
@@ -15,6 +16,15 @@ interface ServiceCardProps {
   onBook: () => void
   index: number
   popular?: boolean
+  promoLabel?: string | null
+  originalPrice?: string
+  promoCampaignLabel?: string | null
+  promoEndDate?: string | null
+}
+
+function formatPromoEndDate(endDate?: string | null) {
+  if (!endDate) return ""
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(endDate))
 }
 
 export function ServiceCard({ 
@@ -27,7 +37,11 @@ export function ServiceCard({
   features,
   onBook, 
   index,
-  popular
+  popular,
+  promoLabel,
+  originalPrice,
+  promoCampaignLabel,
+  promoEndDate,
 }: ServiceCardProps) {
   const colorMap: Record<string, string> = {
     "bronze-pack": "#B9773D",
@@ -128,7 +142,7 @@ export function ServiceCard({
   }
   return (
     <motion.div
-      className={`group relative flex h-full flex-col bg-[#111111] rounded-2xl overflow-hidden cursor-pointer ${cardColor ? 'special-card' : ''}`}
+      className={`group relative flex h-full flex-col bg-[#111111] rounded-2xl overflow-visible cursor-pointer ${cardColor ? 'special-card' : ''}`}
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: index * 0.1 }}
@@ -162,8 +176,10 @@ export function ServiceCard({
         </div>
       )}
 
+      {promoLabel && <PromoRibbon label={promoLabel} />}
+
       {/* Image Container */}
-      <div className="relative h-56 overflow-hidden">
+      <div className="relative h-56 overflow-hidden rounded-t-2xl">
         <Image
           src={image}
           alt={title}
@@ -214,8 +230,20 @@ export function ServiceCard({
         {/* Price */}
         <div className="flex items-baseline gap-2 mb-5 mt-auto">
           <span className="text-white/50 text-xs tracking-wider uppercase">Starting at</span>
-          <span className="text-[#D4A843] font-bold text-2xl">{price}</span>
+          {promoLabel && originalPrice ? (
+            <div className="flex items-baseline gap-2">
+              <span className="text-white/50 font-semibold text-lg line-through">{originalPrice}</span>
+              <span className="text-[#D4A843] font-bold text-2xl">{price}</span>
+            </div>
+          ) : (
+            <span className="text-[#D4A843] font-bold text-2xl">{price}</span>
+          )}
         </div>
+        {promoCampaignLabel && promoEndDate && (
+          <p className="mb-3 text-xs font-semibold text-[#ED0407]">
+            {promoCampaignLabel} — ends {formatPromoEndDate(promoEndDate)}
+          </p>
+        )}
         <p className="text-[#D4A843] text-sm font-semibold mb-5">Duration: {duration}</p>
 
         {/* Book Button */}

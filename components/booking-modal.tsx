@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { X, Info, Check, ChevronLeft, ChevronRight } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { services } from "./services-section"
-import { merchandise } from "./shop-section"
+import { PromoRibbon } from "./promo-ribbon"
 
 interface BookingModalProps {
   isOpen: boolean
@@ -40,65 +40,13 @@ const vehicleTypes = [
 
 const yearRange = Array.from({ length: 30 }, (_, i) => (2026 - i).toString())
 
-const addOns = [
-  {
-    id: "headlight-restoration",
-    name: "Headlight Restoration (per pair)",
-    description:
-      "Restore cloudy headlights to crystal-clear, like-new condition - improving both visibility and your car's overall look.",
-    duration: "2 hrs",
-    price: 1000,
-    durationMinutes: 120,
-  },
-  {
-    id: "engine-bay-cleaning",
-    name: "Engine Bay Cleaning",
-    description:
-      "Deep clean removes grease, grime, and buildup - leaving it spotless.",
-    duration: "30 mins",
-    price: 800,
-    durationMinutes: 30,
-  },
-  {
-    id: "back-to-zero",
-    name: "Back to Zero Sanitation",
-    description:
-      "A deep sanitation process that eliminates bacteria, odors, and contaminants inside your vehicle.",
-    duration: "5 mins",
-    price: 500,
-    durationMinutes: 5,
-  },
-  {
-    id: "water-spot-treatment",
-    name: "Water Spot Treatment",
-    description:
-      "Removes stubborn water spots and restores a flawless shine while eliminating the risk of paint etching.",
-    duration: "10 mins",
-    price: 800,
-    durationMinutes: 10,
-  },
-  {
-    id: "hydrophobic-treatment",
-    name: "Hydrophobic Treatment",
-    description:
-      "Quick Beads boosts shine, enhances water beading, and keeps your paint looking freshly detailed between washes.",
-    duration: "10 mins",
-    price: 800,
-    durationMinutes: 10,
-  },
-  {
-    id: "deluxe-interior-detail",
-    name: "Deluxe Interior Detail",
-    description:
-      "Comprehensive interior detailing that cleans, refreshes, and revitalizes every surface for a spotless and comfortable driving experience.",
-    duration: "30 mins",
-    price: 500,
-    durationMinutes: 30,
-  },
-]
+// This will be populated from API
+let addOns: any[] = []
+let merchandise: any[] = []
 
 export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModalProps) {
   const [step, setStep] = useState<Step>(1)
+  const [pricingLoaded, setPricingLoaded] = useState(false)
   const [phone, setPhone] = useState("")
   const [selectedService, setSelectedService] = useState(initialServiceId || "")
   const [baseServiceForUpgrades, setBaseServiceForUpgrades] = useState(initialServiceId || "")
@@ -121,6 +69,48 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
   const [submitError, setSubmitError] = useState("")
   const [submitNotice, setSubmitNotice] = useState("")
   const contentRef = useRef<HTMLDivElement | null>(null)
+
+  // Load pricing data on mount
+  useEffect(() => {
+    async function loadPricingData() {
+      try {
+        const res = await fetch('/api/pricing')
+        const data = await res.json()
+
+        // Map add-ons with correct display format
+        addOns = (data.addOns || []).map((addon: any) => ({
+          id: addon.slug,
+          name: addon.name,
+          description: addon.name, // Fallback - the API doesn't provide descriptions
+          duration: `${addon.duration_minutes} mins`,
+          price: addon.effective_price || 0,
+          durationMinutes: addon.duration_minutes,
+          priceValue: addon.effective_price || 0,
+          originalPrice: addon.price,
+          promoLabel: addon.active_promo_label,
+        }))
+
+        // Map shop items with correct display format
+        merchandise = (data.shopItems || []).map((item: any) => ({
+          id: item.slug,
+          name: item.name,
+          description: item.name, // Fallback - the API doesn't provide descriptions
+          price: item.effective_price ? `₱${item.effective_price.toLocaleString()}` : '₱0',
+          priceValue: item.effective_price || 0,
+          image: "", // The API doesn't provide images; these should be added to Supabase if needed
+          category: item.category,
+          originalPrice: item.price,
+          promoLabel: item.active_promo_label,
+        }))
+      } catch (err) {
+        console.error('Failed to load pricing data:', err)
+      } finally {
+        setPricingLoaded(true)
+      }
+    }
+
+    loadPricingData()
+  }, [])
 
   useEffect(() => {
     if (contentRef.current) {
@@ -173,6 +163,8 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
   }
 
   const canProceed = () => {
+    if (serviceUnavailable) return false
+
     switch (step) {
       case 1:
         return phone.length >= 10 && name.trim().length >= 2 && email.includes("@")
@@ -276,7 +268,10 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
     )
   }
 
-  const selectedServiceData = services.find((s) => s.id === selectedService)
+  const bookableServices = services.filter(
+    (service) => service.prices && Object.keys(service.prices).length > 0,
+  )
+  const selectedServiceData = bookableServices.find((s) => s.id === selectedService)
   const selectedShopItemsData = selectedShopItems
     .map((itemId) => merchandise.find((item) => item.id === itemId))
     .filter((item): item is typeof merchandise[number] => Boolean(item))
@@ -347,18 +342,25 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
   }, [selectedService])
 
   const selectedServicePrice = selectedServiceData
-    ? vehicleType && selectedServiceData.prices[vehicleType as keyof typeof selectedServiceData.prices]
-      ? selectedServiceData.prices[vehicleType as keyof typeof selectedServiceData.prices]
+    ? vehicleType
+      ? selectedServiceData.prices?.[vehicleType as keyof typeof selectedServiceData.prices]
       : selectedServiceData.priceValue
     : 0
 
-  const baseServiceData = services.find((s) => s.id === baseServiceForUpgrades) || selectedServiceData
+  const baseServiceData = bookableServices.find((s) => s.id === baseServiceForUpgrades) || selectedServiceData
   const baseServiceIsCeramic5yr = baseServiceForUpgrades === "ceramic-coating-5yr"
   const baseServicePrice = baseServiceData
-    ? vehicleType && baseServiceData.prices[vehicleType as keyof typeof baseServiceData.prices]
-      ? baseServiceData.prices[vehicleType as keyof typeof baseServiceData.prices]
+    ? vehicleType
+      ? baseServiceData.prices?.[vehicleType as keyof typeof baseServiceData.prices]
       : baseServiceData.priceValue
     : 0
+
+  const serviceUnavailable = pricingLoaded && Boolean(selectedService) && (
+    !selectedServiceData ||
+    (vehicleType
+      ? selectedServicePrice === undefined
+      : selectedServiceData.priceValue === undefined)
+  )
 
   const isPaintCorrectionAdditive =
     baseServiceForUpgrades === "premium-wash" && selectedService === "paint-correction"
@@ -378,7 +380,10 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
     return total
   }
 
-  const formatCurrency = (value: number) => `₱${value.toLocaleString()}`
+  const formatCurrency = (value: number | undefined) => {
+    if (!value || isNaN(value)) return '₱0'
+    return `₱${value.toLocaleString()}`
+  }
 
   const serviceTotal = calculateTotal()
 
@@ -414,7 +419,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
   }
 
   const availableUpgrades = baseServiceData?.canUpgradeTo
-    ?.map((id) => services.find((service) => service.id === id))
+    ?.map((id) => bookableServices.find((service) => service.id === id))
     .filter((service): service is typeof services[number] => Boolean(service)) || []
 
   useEffect(() => {
@@ -714,7 +719,12 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                       <p className="text-gray-500 text-sm">Choose the service you need for your vehicle.</p>
                     </div>
                     <div className="space-y-3">
-                      {services.map((service) => (
+                      {serviceUnavailable && (
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                          This service is currently unavailable. Please choose another service.
+                        </div>
+                      )}
+                      {bookableServices.map((service) => (
                         <button
                           key={service.id}
                           onClick={() => setSelectedService(service.id)}
@@ -828,12 +838,16 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                           </button>
                         ))}
                       </div>
-                      {selectedServiceData && vehicleType && (
+                      {selectedServiceData && vehicleType && selectedServicePrice !== undefined ? (
                         <div className="mt-3 rounded-xl border border-[#D4A843]/30 bg-[#D4A843]/5 px-4 py-3 text-sm text-gray-700">
                           {selectedServiceData.title} for <span className="font-semibold">{vehicleType}</span>:{" "}
                           <span className="font-bold text-[#D4A843]">₱{selectedServicePrice.toLocaleString()}</span>
                         </div>
-                      )}
+                      ) : serviceUnavailable ? (
+                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                          This service is currently unavailable. Please choose another service.
+                        </div>
+                      ) : null}
                     </div>
                   </motion.div>
                 )}
@@ -862,9 +876,10 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                       <div className="space-y-4">
                         {availableUpgrades.length > 0 ? (
                           availableUpgrades.map((upgrade) => {
-                            const upgradePrice = vehicleType && upgrade.prices?.[vehicleType as keyof typeof upgrade.prices]
-                              ? upgrade.prices[vehicleType as keyof typeof upgrade.prices]
+                            const upgradePrice = vehicleType
+                              ? upgrade.prices?.[vehicleType as keyof typeof upgrade.prices]
                               : upgrade.priceValue
+                            if (upgradePrice === undefined) return null
                             const priceDifference = Math.max(upgradePrice - baseServicePrice, 0)
                             const showAsAdditional =
                               baseServiceForUpgrades === "premium-wash" && upgrade.id === "paint-correction"
@@ -935,10 +950,11 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                               key={addon.id}
                               type="button"
                               onClick={() => toggleAddOn(addon.id)}
-                              className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                              className={`relative w-full overflow-visible rounded-2xl border p-4 text-left transition-all ${
                                 selected ? "border-[#D4A843] bg-[#D4A843]/5" : "border-gray-200 hover:border-gray-300"
                               }`}
                             >
+                              {addon.promoLabel && <PromoRibbon label={addon.promoLabel} />}
                               <div className="flex items-center justify-between gap-4">
                                 <div>
                                   <h5 className="font-semibold text-gray-900">{addon.name}</h5>
@@ -948,7 +964,14 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                                   <div className="flex flex-col items-end">
                                     <div className="text-[#D4A843] font-bold flex items-baseline gap-1">
                                       <span>+</span>
-                                      <span>₱{addon.price.toLocaleString()}</span>
+                                      {addon.promoLabel && addon.originalPrice ? (
+                                        <>
+                                          <span className="text-sm text-gray-400 line-through">₱{addon.originalPrice.toLocaleString()}</span>
+                                          <span className="text-[#D4A843]">₱{addon.price.toLocaleString()}</span>
+                                        </>
+                                      ) : (
+                                        <span>₱{addon.price.toLocaleString()}</span>
+                                      )}
                                     </div>
                                     <p className="text-xs text-[#D4A843] font-medium">{addon.duration}</p>
                                   </div>
@@ -979,9 +1002,17 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                                 selected ? "border-[#D4A843] bg-[#FDF7E4]" : "border-gray-200 bg-white hover:border-gray-300"
                               }`}
                             >
+                              {item.promoLabel && <PromoRibbon label={item.promoLabel} />}
                               <span className="absolute top-7 right-3 z-50 pointer-events-none text-[#D4A843] font-bold inline-flex items-baseline gap-1">
                                 <span className="text-sm">+</span>
-                                <span>{item.price}</span>
+                                {item.promoLabel && item.originalPrice ? (
+                                  <>
+                                    <span className="text-sm text-gray-400 line-through">₱{item.originalPrice.toLocaleString()}</span>
+                                    <span>{item.price}</span>
+                                  </>
+                                ) : (
+                                  <span>{item.price}</span>
+                                )}
                               </span>
 
                               <div className="flex items-start gap-3">

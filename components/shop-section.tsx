@@ -1,15 +1,16 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
+import { PromoRibbon } from "./promo-ribbon"
 
-export const merchandise = [
+// Static shop item metadata - prices will be fetched from API
+const shopItemMetadata = [
   {
     id: "tshirt-black",
     name: "Wayne's Detailing T-Shirt",
     description: "Premium black performance tee with Wayne's Detailing front logo print.",
-    price: "₱650",
-    priceValue: 650,
     image: "/images/shop-tshirt-waynes.png",
     category: "Apparel",
   },
@@ -17,8 +18,6 @@ export const merchandise = [
     id: "cap",
     name: "Snapback Cap",
     description: "Classic black cap with embroidered Wayne's Detailing logo and motto.",
-    price: "₱450",
-    priceValue: 450,
     image: "/images/shop-cap-waynes.png",
     category: "Apparel",
   },
@@ -26,8 +25,6 @@ export const merchandise = [
     id: "microfiber-set",
     name: "Coffee Mug",
     description: "Matte black ceramic mug featuring Wayne's Detailing signature branding.",
-    price: "₱850",
-    priceValue: 850,
     image: "/images/shop-mug-waynes.png",
     category: "Lifestyle",
   },
@@ -35,14 +32,53 @@ export const merchandise = [
     id: "cleaning-kit",
     name: "Umbrella",
     description: "Full-size black umbrella with Wayne's Detailing logo for all-weather use.",
-    price: "₱1,500",
-    priceValue: 1500,
     image: "/images/shop-umbrella-waynes.png",
     category: "Lifestyle",
   },
 ]
 
+export let merchandise: any[] = []
+
+function formatPromoEndDate(endDate?: string | null) {
+  if (!endDate) return ""
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(endDate))
+}
+
 export function ShopSection() {
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function loadPricing() {
+      try {
+        const res = await fetch('/api/pricing')
+        const data = await res.json()
+
+        // Merge API pricing with static metadata
+        merchandise = shopItemMetadata.map(metadata => {
+          const apiItem = data.shopItems.find((s: any) => s.slug === metadata.id)
+          if (!apiItem) return { ...metadata, price: "₱0", priceValue: 0, apiData: null }
+
+          return {
+            ...metadata,
+            price: `₱${apiItem.effective_price.toLocaleString()}`,
+            priceValue: apiItem.effective_price,
+            promoLabel: apiItem.active_promo_label,
+            originalPrice: apiItem.price,
+            promoCampaignLabel: apiItem.promo_label,
+            promoEndDate: apiItem.promo_end_date,
+            apiData: apiItem,
+          }
+        })
+
+        setLoading(false)
+      } catch (err) {
+        console.error('Failed to load pricing:', err)
+        setLoading(false)
+      }
+    }
+
+    loadPricing()
+  }, [])
   return (
     <section id="shop" className="py-20 bg-[#0A0A0A]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -85,57 +121,75 @@ export function ShopSection() {
 
         {/* Merchandise Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {merchandise.map((item, index) => (
-            <motion.div
-              key={item.id}
-              className="group relative bg-[#111111] rounded-2xl overflow-hidden transition-all duration-200 cursor-pointer"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1 }}
-              viewport={{ once: true }}
-              whileHover={{ scale: 1.02 }}
-              style={{
-                boxShadow: "0 0 0 1px rgba(42, 42, 42, 1)",
-              }}
-            >
-              {/* Gold glow border on hover */}
-              <div
-                className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-20"
+          {loading ? (
+            <div className="col-span-full text-center text-white/50">Loading...</div>
+          ) : (
+            merchandise.map((item, index) => (
+              <motion.div
+                key={item.id}
+                className="group relative bg-[#111111] rounded-2xl overflow-visible transition-all duration-200 cursor-pointer"
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                viewport={{ once: true }}
+                whileHover={{ scale: 1.02 }}
                 style={{
-                  boxShadow: "0 0 18px rgba(212, 168, 67, 0.35), 0 0 28px rgba(212, 168, 67, 0.2), inset 0 0 0 1px rgba(212, 168, 67, 0.75)",
+                  boxShadow: "0 0 0 1px rgba(42, 42, 42, 1)",
                 }}
-              />
+              >
+                {item.promoLabel && <PromoRibbon label={item.promoLabel} />}
 
-              {/* Category Badge */}
-              <div className="absolute top-3 left-3 z-10 bg-[#D4A843] text-black text-xs font-bold px-2 py-1 rounded">
-                {item.category}
-              </div>
-
-              {/* Image Container */}
-              <div className="relative h-67 overflow-hidden bg-gradient-to-br from-[#171717] to-[#0f0f0f]">
-                <Image
-                  src={item.image}
-                  alt={item.name}
-                  fill
-                  loading="eager"
-                  className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                {/* Gold glow border on hover */}
+                <div
+                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-20"
+                  style={{
+                    boxShadow: "0 0 18px rgba(212, 168, 67, 0.35), 0 0 28px rgba(212, 168, 67, 0.2), inset 0 0 0 1px rgba(212, 168, 67, 0.75)",
+                  }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#111111] via-transparent to-transparent" />
-              </div>
 
-              {/* Content */}
-              <div className="p-5 relative z-10">
-                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-[#D4A843] transition-colors duration-300">
-                  {item.name}
-                </h3>
-                <p className="text-white/50 text-sm mb-4 line-clamp-2">
-                  {item.description}
-                </p>
+                {/* Category Badge */}
+                <div className="absolute top-3 left-3 z-10 bg-[#D4A843] text-black text-xs font-bold px-2 py-1 rounded">
+                  {item.category}
+                </div>
 
-                <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
-              </div>
-            </motion.div>
-          ))}
+                {/* Image Container */}
+                <div className="relative h-67 overflow-hidden rounded-t-2xl bg-gradient-to-br from-[#171717] to-[#0f0f0f]">
+                  <Image
+                    src={item.image}
+                    alt={item.name}
+                    fill
+                    loading="eager"
+                    className="object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#111111] via-transparent to-transparent" />
+                </div>
+
+                {/* Content */}
+                <div className="p-5 relative z-10">
+                  <h3 className="text-lg font-bold text-white mb-2 group-hover:text-[#D4A843] transition-colors duration-300">
+                    {item.name}
+                  </h3>
+                  <p className="text-white/50 text-sm mb-4 line-clamp-2">
+                    {item.description}
+                  </p>
+
+                  {item.promoLabel && item.originalPrice ? (
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-white/50 font-semibold text-sm line-through">₱{item.originalPrice.toLocaleString()}</span>
+                      <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
+                    </div>
+                  ) : (
+                    <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
+                  )}
+                  {item.promoCampaignLabel && item.promoEndDate && (
+                    <p className="mt-2 text-xs font-semibold text-[#ED0407]">
+                      {item.promoCampaignLabel} — ends {formatPromoEndDate(item.promoEndDate)}
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
 
         <motion.div
