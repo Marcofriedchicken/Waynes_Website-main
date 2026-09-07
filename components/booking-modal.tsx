@@ -7,6 +7,11 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { services } from "./services-section"
 import { PromoRibbon } from "./promo-ribbon"
 
+function formatPromoEndDate(endDate?: string | null) {
+  if (!endDate) return ""
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(endDate))
+}
+
 interface BookingModalProps {
   isOpen: boolean
   onClose: () => void
@@ -87,7 +92,9 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
           durationMinutes: addon.duration_minutes,
           priceValue: addon.effective_price || 0,
           originalPrice: addon.price,
-          promoLabel: addon.active_promo_label,
+          promoDiscount: addon.active_promo_label,
+          promoTitle: addon.promo_label,
+          promoEndDate: addon.promo_end_date,
         }))
 
         // Map shop items with correct display format
@@ -100,7 +107,9 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
           image: "", // The API doesn't provide images; these should be added to Supabase if needed
           category: item.category,
           originalPrice: item.price,
-          promoLabel: item.active_promo_label,
+          promoDiscount: item.active_promo_label,
+          promoTitle: item.promo_label,
+          promoEndDate: item.promo_end_date,
         }))
       } catch (err) {
         console.error('Failed to load pricing data:', err)
@@ -954,7 +963,13 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                                 selected ? "border-[#D4A843] bg-[#D4A843]/5" : "border-gray-200 hover:border-gray-300"
                               }`}
                             >
-                              {addon.promoLabel && <PromoRibbon label={addon.promoLabel} />}
+                              {addon.promoDiscount && (
+                                <PromoRibbon
+                                  title={addon.promoTitle || "SALE"}
+                                  discount={addon.promoDiscount}
+                                  endDate={formatPromoEndDate(addon.promoEndDate)}
+                                />
+                              )}
                               <div className="flex items-center justify-between gap-4">
                                 <div>
                                   <h5 className="font-semibold text-gray-900">{addon.name}</h5>
@@ -964,7 +979,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                                   <div className="flex flex-col items-end">
                                     <div className="text-[#D4A843] font-bold flex items-baseline gap-1">
                                       <span>+</span>
-                                      {addon.promoLabel && addon.originalPrice ? (
+                                      {addon.promoDiscount && addon.originalPrice ? (
                                         <>
                                           <span className="text-sm text-gray-400 line-through">₱{addon.originalPrice.toLocaleString()}</span>
                                           <span className="text-[#D4A843]">₱{addon.price.toLocaleString()}</span>
@@ -1002,10 +1017,16 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                                 selected ? "border-[#D4A843] bg-[#FDF7E4]" : "border-gray-200 bg-white hover:border-gray-300"
                               }`}
                             >
-                              {item.promoLabel && <PromoRibbon label={item.promoLabel} />}
+                              {item.promoDiscount && (
+                                <PromoRibbon
+                                  title={item.promoTitle || "SALE"}
+                                  discount={item.promoDiscount}
+                                  endDate={formatPromoEndDate(item.promoEndDate)}
+                                />
+                              )}
                               <span className="absolute top-7 right-3 z-50 pointer-events-none text-[#D4A843] font-bold inline-flex items-baseline gap-1">
                                 <span className="text-sm">+</span>
-                                {item.promoLabel && item.originalPrice ? (
+                                {item.promoDiscount && item.originalPrice ? (
                                   <>
                                     <span className="text-sm text-gray-400 line-through">₱{item.originalPrice.toLocaleString()}</span>
                                     <span>{item.price}</span>

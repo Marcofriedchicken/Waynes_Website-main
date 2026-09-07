@@ -284,9 +284,9 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
                 features={service.features}
                 onBook={() => onBookService(service.id)}
                 index={index}
-                promoLabel={promoInfo?.active_promo_label}
+                promoDiscount={promoInfo?.active_promo_label}
                 originalPrice={originalPrice ? `₱${originalPrice.toLocaleString()}` : undefined}
-                promoCampaignLabel={promoInfo?.promo_label}
+                promoTitle={promoInfo?.promo_label}
                 promoEndDate={promoInfo?.promo_end_date}
               />
             )
@@ -311,9 +311,9 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
                 features={service.features}
                 onBook={() => onBookService(service.id)}
                 index={firstRowServices.length + index}
-                promoLabel={promoInfo?.active_promo_label}
+                promoDiscount={promoInfo?.active_promo_label}
                 originalPrice={originalPrice ? `₱${originalPrice.toLocaleString()}` : undefined}
-                promoCampaignLabel={promoInfo?.promo_label}
+                promoTitle={promoInfo?.promo_label}
                 promoEndDate={promoInfo?.promo_end_date}
               />
             )
@@ -338,9 +338,9 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
                 features={service.features}
                 onBook={() => onBookService(service.id)}
                 index={firstRowServices.length + secondRowServices.length + index}
-                promoLabel={promoInfo?.active_promo_label}
+                promoDiscount={promoInfo?.active_promo_label}
                 originalPrice={originalPrice ? `₱${originalPrice.toLocaleString()}` : undefined}
-                promoCampaignLabel={promoInfo?.promo_label}
+                promoTitle={promoInfo?.promo_label}
                 promoEndDate={promoInfo?.promo_end_date}
               />
             )

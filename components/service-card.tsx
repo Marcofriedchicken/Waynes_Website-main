@@ -16,9 +16,9 @@ interface ServiceCardProps {
   onBook: () => void
   index: number
   popular?: boolean
-  promoLabel?: string | null
+  promoDiscount?: string | null
   originalPrice?: string
-  promoCampaignLabel?: string | null
+  promoTitle?: string | null
   promoEndDate?: string | null
 }
 
@@ -38,9 +38,9 @@ export function ServiceCard({
   onBook, 
   index,
   popular,
-  promoLabel,
+  promoDiscount,
   originalPrice,
-  promoCampaignLabel,
+  promoTitle,
   promoEndDate,
 }: ServiceCardProps) {
   const colorMap: Record<string, string> = {
@@ -176,7 +176,13 @@ export function ServiceCard({
         </div>
       )}
 
-      {promoLabel && <PromoRibbon label={promoLabel} />}
+      {promoDiscount && (
+        <PromoRibbon
+          title={promoTitle || "SALE"}
+          discount={promoDiscount}
+          endDate={formatPromoEndDate(promoEndDate)}
+        />
+      )}
 
       {/* Image Container */}
       <div className="relative h-56 overflow-hidden rounded-t-2xl">
@@ -230,7 +236,7 @@ export function ServiceCard({
         {/* Price */}
         <div className="flex items-baseline gap-2 mb-5 mt-auto">
           <span className="text-white/50 text-xs tracking-wider uppercase">Starting at</span>
-          {promoLabel && originalPrice ? (
+          {promoDiscount && originalPrice ? (
             <div className="flex items-baseline gap-2">
               <span className="text-white/50 font-semibold text-lg line-through">{originalPrice}</span>
               <span className="text-[#D4A843] font-bold text-2xl">{price}</span>
@@ -239,11 +245,6 @@ export function ServiceCard({
             <span className="text-[#D4A843] font-bold text-2xl">{price}</span>
           )}
         </div>
-        {promoCampaignLabel && promoEndDate && (
-          <p className="mb-3 text-xs font-semibold text-[#ED0407]">
-            {promoCampaignLabel} — ends {formatPromoEndDate(promoEndDate)}
-          </p>
-        )}
         <p className="text-[#D4A843] text-sm font-semibold mb-5">Duration: {duration}</p>
 
         {/* Book Button */}

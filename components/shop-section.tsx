@@ -62,9 +62,9 @@ export function ShopSection() {
             ...metadata,
             price: `₱${apiItem.effective_price.toLocaleString()}`,
             priceValue: apiItem.effective_price,
-            promoLabel: apiItem.active_promo_label,
+            promoDiscount: apiItem.active_promo_label,
             originalPrice: apiItem.price,
-            promoCampaignLabel: apiItem.promo_label,
+            promoTitle: apiItem.promo_label,
             promoEndDate: apiItem.promo_end_date,
             apiData: apiItem,
           }
@@ -137,7 +137,13 @@ export function ShopSection() {
                   boxShadow: "0 0 0 1px rgba(42, 42, 42, 1)",
                 }}
               >
-                {item.promoLabel && <PromoRibbon label={item.promoLabel} />}
+                {item.promoDiscount && (
+                  <PromoRibbon
+                    title={item.promoTitle || "SALE"}
+                    discount={item.promoDiscount}
+                    endDate={formatPromoEndDate(item.promoEndDate)}
+                  />
+                )}
 
                 {/* Gold glow border on hover */}
                 <div
@@ -173,18 +179,13 @@ export function ShopSection() {
                     {item.description}
                   </p>
 
-                  {item.promoLabel && item.originalPrice ? (
+                  {item.promoDiscount && item.originalPrice ? (
                     <div className="flex items-baseline gap-2">
                       <span className="text-white/50 font-semibold text-sm line-through">₱{item.originalPrice.toLocaleString()}</span>
                       <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
                     </div>
                   ) : (
                     <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
-                  )}
-                  {item.promoCampaignLabel && item.promoEndDate && (
-                    <p className="mt-2 text-xs font-semibold text-[#ED0407]">
-                      {item.promoCampaignLabel} — ends {formatPromoEndDate(item.promoEndDate)}
-                    </p>
                   )}
                 </div>
               </motion.div>
