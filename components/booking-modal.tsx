@@ -88,9 +88,9 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
           name: addon.name,
           description: addon.name, // Fallback - the API doesn't provide descriptions
           duration: `${addon.duration_minutes} mins`,
-          price: addon.effective_price || 0,
+          price: addon.effective_price ?? 0,
           durationMinutes: addon.duration_minutes,
-          priceValue: addon.effective_price || 0,
+          priceValue: addon.effective_price ?? 0,
           originalPrice: addon.price,
           promoDiscount: addon.active_promo_label,
           promoTitle: addon.promo_label,
@@ -102,8 +102,10 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
           id: item.slug,
           name: item.name,
           description: item.name, // Fallback - the API doesn't provide descriptions
-          price: item.effective_price ? `₱${item.effective_price.toLocaleString()}` : '₱0',
-          priceValue: item.effective_price || 0,
+          price: item.effective_price !== undefined && item.effective_price !== null
+            ? `₱${item.effective_price.toLocaleString()}`
+            : '₱0',
+          priceValue: item.effective_price ?? 0,
           image: "", // The API doesn't provide images; these should be added to Supabase if needed
           category: item.category,
           originalPrice: item.price,
@@ -355,6 +357,9 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
       ? selectedServiceData.prices?.[vehicleType as keyof typeof selectedServiceData.prices]
       : selectedServiceData.priceValue
     : 0
+  const selectedServiceTierPricing = vehicleType
+    ? selectedServiceData?.apiPricing?.[vehicleType]
+    : selectedServiceData?.apiPricing?.["Compact/Hatch"]
 
   const baseServiceData = bookableServices.find((s) => s.id === baseServiceForUpgrades) || selectedServiceData
   const baseServiceIsCeramic5yr = baseServiceForUpgrades === "ceramic-coating-5yr"
@@ -756,7 +761,19 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                               </div>
                               <div>
                                 <div className="font-semibold text-gray-900">{service.title}</div>
-                                <div className="text-sm text-gray-500">Starting at <span className="font-semibold text-gray-900">{service.price}</span></div>
+                                <div className="flex items-baseline gap-2 text-sm text-gray-500">
+                                  <span>Starting at</span>
+                                  {service.apiPricing?.["Compact/Hatch"]?.active_promo_label ? (
+                                    <>
+                                      <span className="font-semibold text-gray-400 line-through">
+                                        ₱{service.apiPricing["Compact/Hatch"].price.toLocaleString()}
+                                      </span>
+                                      <span className="font-bold text-[#D4A843]">{service.price}</span>
+                                    </>
+                                  ) : (
+                                    <span className="font-semibold text-gray-900">{service.price}</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                             {selectedService === service.id && (
@@ -850,6 +867,11 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                       {selectedServiceData && vehicleType && selectedServicePrice !== undefined ? (
                         <div className="mt-3 rounded-xl border border-[#D4A843]/30 bg-[#D4A843]/5 px-4 py-3 text-sm text-gray-700">
                           {selectedServiceData.title} for <span className="font-semibold">{vehicleType}</span>:{" "}
+                          {selectedServiceTierPricing?.active_promo_label && (
+                            <span className="mr-2 text-gray-400 line-through">
+                              ₱{selectedServiceTierPricing.price.toLocaleString()}
+                            </span>
+                          )}
                           <span className="font-bold text-[#D4A843]">₱{selectedServicePrice.toLocaleString()}</span>
                         </div>
                       ) : serviceUnavailable ? (
@@ -889,6 +911,9 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                               ? upgrade.prices?.[vehicleType as keyof typeof upgrade.prices]
                               : upgrade.priceValue
                             if (upgradePrice === undefined) return null
+                            const upgradePricing = vehicleType
+                              ? upgrade.apiPricing?.[vehicleType]
+                              : upgrade.apiPricing?.["Compact/Hatch"]
                             const priceDifference = Math.max(upgradePrice - baseServicePrice, 0)
                             const showAsAdditional =
                               baseServiceForUpgrades === "premium-wash" && upgrade.id === "paint-correction"
@@ -918,10 +943,15 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                                   <div className="flex-1">
                                     <div className="flex items-center justify-between gap-3">
                                       <h4 className="font-bold text-gray-900">{upgrade.title}</h4>
-                                      <span className="text-[#D4A843] font-bold">
-                                        {showAsAdditional
-                                          ? `+₱${upgradePrice.toLocaleString()}`
-                                          : `₱${upgradePrice.toLocaleString()}`}
+                                      <span className="text-[#D4A843] font-bold inline-flex items-baseline gap-2">
+                                        {upgradePricing?.active_promo_label && (
+                                          <span className="text-sm text-gray-400 line-through">
+                                            ₱{upgradePricing.price.toLocaleString()}
+                                          </span>
+                                        )}
+                                        <span>
+                                          {showAsAdditional ? "+" : ""}₱{upgradePrice.toLocaleString()}
+                                        </span>
                                       </span>
                                     </div>
                                     <p className="text-gray-500 text-sm mt-1">{upgrade.description}</p>
@@ -979,7 +1009,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                                   <div className="flex flex-col items-end">
                                     <div className="text-[#D4A843] font-bold flex items-baseline gap-1">
                                       <span>+</span>
-                                      {addon.promoDiscount && addon.originalPrice ? (
+                                      {addon.promoDiscount && addon.originalPrice !== undefined && addon.originalPrice !== null ? (
                                         <>
                                           <span className="text-sm text-gray-400 line-through">₱{addon.originalPrice.toLocaleString()}</span>
                                           <span className="text-[#D4A843]">₱{addon.price.toLocaleString()}</span>
@@ -1026,7 +1056,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                               )}
                               <span className="absolute top-7 right-3 z-50 pointer-events-none text-[#D4A843] font-bold inline-flex items-baseline gap-1">
                                 <span className="text-sm">+</span>
-                                {item.promoDiscount && item.originalPrice ? (
+                                {item.promoDiscount && item.originalPrice !== undefined && item.originalPrice !== null ? (
                                   <>
                                     <span className="text-sm text-gray-400 line-through">₱{item.originalPrice.toLocaleString()}</span>
                                     <span>{item.price}</span>

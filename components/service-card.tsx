@@ -109,7 +109,7 @@ export function ServiceCard({
       WebkitBackgroundClip: "text",
       WebkitTextFillColor: "transparent",
       color: "transparent",
-      textShadow: `0 0 16px ${cardColor ?? "#ffffff"}99`,
+      textShadow: `0 0 16px ${withHexAlpha(cardColor ?? "#ffffff", "99")}`,
       filter: "brightness(1.25)",
     } as React.CSSProperties
   }
@@ -251,7 +251,7 @@ export function ServiceCard({
         {/* Price */}
         <div className="flex items-baseline gap-2 mb-5 mt-auto">
           <span className="text-white/50 text-xs tracking-wider uppercase">Starting at</span>
-          {promoDiscount && originalPrice ? (
+          {promoDiscount && originalPrice !== undefined && originalPrice !== null ? (
             <div className="flex items-baseline gap-2">
               <span className="text-white/50 font-semibold text-lg line-through">{originalPrice}</span>
               <span className="text-[#D4A843] font-bold text-2xl">{price}</span>

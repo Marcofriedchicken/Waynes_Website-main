@@ -1,6 +1,7 @@
 "use client"
 
 import { motion } from "framer-motion"
+import { useState } from "react"
 import { Award, Clock, Shield, Users, ThumbsUp, Wrench } from "lucide-react"
 
 const features = [
@@ -62,35 +63,54 @@ export function WhyChooseUs() {
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              className="relative p-6 rounded-2xl bg-[#0A0A0A] border border-[#2A2A2A] group hover:border-[#D4A843]/30 transition-all duration-300"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              viewport={{ once: true }}
-            >
-              {/* Icon */}
-              <div className="mb-4">
-                <div className="w-12 h-12 rounded-xl bg-[#D4A843]/10 flex items-center justify-center group-hover:bg-[#D4A843]/20 transition-colors">
-                  <feature.icon className="w-6 h-6 text-[#D4A843]" />
-                </div>
-              </div>
-
-              {/* Content */}
-              <h3 className="text-xl font-bold text-white mb-2">
-                {feature.title}
-              </h3>
-              <p className="text-white/60 text-sm">
-                {feature.description}
-              </p>
-
-              {/* Decorative Line */}
-              <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-[#D4A843]/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-            </motion.div>
+            <FeatureCard key={feature.title} feature={feature} index={index} />
           ))}
         </div>
       </div>
     </section>
+  )
+}
+
+function FeatureCard({ feature, index }: { feature: typeof features[number]; index: number }) {
+  const [hovered, setHovered] = useState(false)
+  const [active, setActive] = useState(false)
+  const highlighted = hovered || active
+
+  return (
+    <motion.div
+      className={`group relative p-6 rounded-2xl bg-[#0A0A0A] border transition-all duration-300 ${
+        highlighted ? "border-[#D4A843]/30" : "border-[#2A2A2A]"
+      }`}
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: index * 0.1 }}
+      viewport={{ once: true }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => setActive((value) => !value)}
+      data-active={active}
+    >
+      {/* Icon */}
+      <div className="mb-4">
+        <div className={`w-12 h-12 rounded-xl bg-[#D4A843]/10 flex items-center justify-center transition-colors ${
+          highlighted ? "bg-[#D4A843]/20" : ""
+        }`}>
+          <feature.icon className="w-6 h-6 text-[#D4A843]" />
+        </div>
+      </div>
+
+      {/* Content */}
+      <h3 className="text-xl font-bold text-white mb-2">
+        {feature.title}
+      </h3>
+      <p className="text-white/60 text-sm">
+        {feature.description}
+      </p>
+
+      {/* Decorative Line */}
+      <div className={`absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-[#D4A843]/30 to-transparent transition-opacity ${
+        highlighted ? "opacity-100" : "opacity-0"
+      }`} />
+    </motion.div>
   )
 }

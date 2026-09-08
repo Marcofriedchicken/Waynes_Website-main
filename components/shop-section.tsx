@@ -125,18 +125,48 @@ export function ShopSection() {
             <div className="col-span-full text-center text-white/50">Loading...</div>
           ) : (
             merchandise.map((item, index) => (
-              <motion.div
-                key={item.id}
-                className="group relative bg-[#111111] rounded-2xl overflow-visible transition-all duration-200 cursor-pointer"
-                initial={{ opacity: 0, y: 40 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                whileHover={{ scale: 1.02 }}
-                style={{
-                  boxShadow: "0 0 0 1px rgba(42, 42, 42, 1)",
-                }}
-              >
+              <ShopCard key={item.id} item={item} index={index} />
+            ))
+          )}
+        </div>
+
+        <motion.div
+          className="mt-12 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          viewport={{ once: true }}
+        >
+          <p className="text-white/70 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
+            Shop our official gear or collect it in person at the studio for a premium detailing experience and a brand you can rep with pride.
+          </p>
+        </motion.div>
+      </div>
+    </section>
+  )
+}
+
+function ShopCard({ item, index }: { item: any; index: number }) {
+  const [hovered, setHovered] = useState(false)
+  const [active, setActive] = useState(false)
+  const highlighted = hovered || active
+
+  return (
+    <motion.div
+      className="group relative bg-[#111111] rounded-2xl overflow-visible transition-all duration-200 cursor-pointer"
+      initial={{ opacity: 0, y: 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: index * 0.1 }}
+      viewport={{ once: true }}
+      whileHover={{ scale: 1.02 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => setActive((value) => !value)}
+      data-active={active}
+      style={{
+        boxShadow: "0 0 0 1px rgba(42, 42, 42, 1)",
+      }}
+    >
                 {item.promoDiscount && (
                   <PromoRibbon
                     title={item.promoTitle || "SALE"}
@@ -147,8 +177,9 @@ export function ShopSection() {
 
                 {/* Gold glow border on hover */}
                 <div
-                  className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-20"
+                  className="absolute inset-0 rounded-2xl transition-opacity duration-150 pointer-events-none z-20"
                   style={{
+                    opacity: highlighted ? 1 : 0,
                     boxShadow: "0 0 18px rgba(212, 168, 67, 0.35), 0 0 28px rgba(212, 168, 67, 0.2), inset 0 0 0 1px rgba(212, 168, 67, 0.75)",
                   }}
                 />
@@ -179,7 +210,7 @@ export function ShopSection() {
                     {item.description}
                   </p>
 
-                  {item.promoDiscount && item.originalPrice ? (
+                  {item.promoDiscount && item.originalPrice !== undefined && item.originalPrice !== null ? (
                     <div className="flex items-baseline gap-2">
                       <span className="text-white/50 font-semibold text-sm line-through">₱{item.originalPrice.toLocaleString()}</span>
                       <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
@@ -188,23 +219,6 @@ export function ShopSection() {
                     <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
                   )}
                 </div>
-              </motion.div>
-            ))
-          )}
-        </div>
-
-        <motion.div
-          className="mt-12 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          viewport={{ once: true }}
-        >
-          <p className="text-white/70 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-            Shop our official gear or collect it in person at the studio for a premium detailing experience and a brand you can rep with pride.
-          </p>
-        </motion.div>
-      </div>
-    </section>
+    </motion.div>
   )
 }

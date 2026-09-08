@@ -204,8 +204,10 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
           )
 
           const firstVehicleType = 'Compact/Hatch'
-          const priceValue = prices[firstVehicleType] || 0
-          const priceDisplay = priceValue > 0 ? `₱${priceValue.toLocaleString()}` : ''
+          const priceValue = prices[firstVehicleType] ?? 0
+          const priceDisplay = priceValue !== undefined && priceValue !== null
+            ? `₱${priceValue.toLocaleString()}`
+            : ''
 
           return {
             ...metadata,
@@ -285,7 +287,7 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
                 onBook={() => onBookService(service.id)}
                 index={index}
                 promoDiscount={promoInfo?.active_promo_label}
-                originalPrice={originalPrice ? `₱${originalPrice.toLocaleString()}` : undefined}
+                originalPrice={originalPrice !== undefined && originalPrice !== null ? `₱${originalPrice.toLocaleString()}` : undefined}
                 promoTitle={promoInfo?.promo_label}
                 promoEndDate={promoInfo?.promo_end_date}
               />
@@ -312,7 +314,7 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
                 onBook={() => onBookService(service.id)}
                 index={firstRowServices.length + index}
                 promoDiscount={promoInfo?.active_promo_label}
-                originalPrice={originalPrice ? `₱${originalPrice.toLocaleString()}` : undefined}
+                originalPrice={originalPrice !== undefined && originalPrice !== null ? `₱${originalPrice.toLocaleString()}` : undefined}
                 promoTitle={promoInfo?.promo_label}
                 promoEndDate={promoInfo?.promo_end_date}
               />
@@ -339,7 +341,7 @@ export function ServicesSection({ onBookService }: ServicesSectionProps) {
                 onBook={() => onBookService(service.id)}
                 index={firstRowServices.length + secondRowServices.length + index}
                 promoDiscount={promoInfo?.active_promo_label}
-                originalPrice={originalPrice ? `₱${originalPrice.toLocaleString()}` : undefined}
+                originalPrice={originalPrice !== undefined && originalPrice !== null ? `₱${originalPrice.toLocaleString()}` : undefined}
                 promoTitle={promoInfo?.promo_label}
                 promoEndDate={promoInfo?.promo_end_date}
               />
