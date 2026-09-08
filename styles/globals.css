@@ -149,5 +149,5 @@
 .special-card:hover .special-glow,
 .special-card[data-active="true"] .special-glow {
   opacity: 1;
-  box-shadow: 0 0 48px var(--special-color-88, #D4A84388), 0 0 88px var(--special-color-55, #D4A84355), inset 0 0 0 2px var(--special-color, #D4A843);
+  box-shadow: 0 0 48px var(--special-color, #D4A843)88, 0 0 88px var(--special-color, #D4A843)55, inset 0 0 0 2px var(--special-color, #D4A843);
 }

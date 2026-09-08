@@ -22,11 +22,11 @@ function Logo({ className }: { className?: string }) {
       <img
         src="/images/w-logo.png"
         alt="Wayne's Detailing W mark"
-        className="h-10 w-auto mb-1 object-contain"
+        className="h-7 md:h-10 w-auto mb-1 object-contain"
       />
       {/* Text */}
       <div className="text-center">
-        <div className="text-[#ED0407] font-black text-sm tracking-[0.2em]">
+        <div className="text-[#ED0407] font-black text-xs md:text-sm tracking-[0.12em] md:tracking-[0.2em] whitespace-nowrap">
           WAYNE&apos;S DETAILING
         </div>
         <div className="text-white/80 text-[10px] tracking-[0.3em] mt-0.5">
