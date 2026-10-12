@@ -75,6 +75,7 @@ export function ServiceCard({
   // interactive state to color the 'after' title on hover or click
   const [hovered, setHovered] = useState(false)
   const [active, setActive] = useState(false)
+  const activeGlow = hovered || active
 
   const goldColor = "#D4A843"
   const goldBulletIds = new Set(["express-wash", "premium-wash", "paint-correction"])
@@ -96,7 +97,6 @@ export function ServiceCard({
   })
 
   const getMetallicTextStyle = (keyword: string) => {
-    const activeGlow = hovered || active
     const gradient = metallicGradients[keyword] || metallicGradients.silver
 
     if (!activeGlow) {
@@ -174,7 +174,7 @@ export function ServiceCard({
     >
       {/* colored glow border on hover for specific cards */}
       <div
-        className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-100 ease-out pointer-events-none z-20 special-glow`}
+        className={`absolute inset-0 rounded-2xl transition-opacity duration-100 ease-out pointer-events-none z-20 special-glow ${activeGlow ? "opacity-100" : "opacity-0"}`}
         style={{
           boxShadow: cardColor
             ? (hovered || active)
