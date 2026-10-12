@@ -9,7 +9,7 @@ export const OPERATING_HOURS = {
 export const POOLS = {
   A: {
     id: "A",
-    capacity: 3,
+    capacity: 2,
     services: [
       "Essential Wash",
       "Premium Wash",
