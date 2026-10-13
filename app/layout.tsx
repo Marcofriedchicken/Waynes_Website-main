@@ -14,8 +14,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Wayne's Detailing | Premium Auto Detailing Services in Pasig",
-  description: "GET IT DONE - Premium car detailing services including carwash, engine wash, ceramic coating, wax & buffing, and more. Located in Pasig City.",
+  description: "GET IT DONE - Premium car detailing services including carwash, engine wash, ceramic coating, wax and buffing, and more. Located in Pasig City.",
   keywords: "car detailing, auto detailing, ceramic coating, car wash, Pasig, Pasig City, Philippines",
+  verification: {
+    google: "sWt3KPiR1tm5oJ-jtIuo_3naztKw3sA0dJVd4Bo0PYc",
+  },
 }
 
 export default function RootLayout({
