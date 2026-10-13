@@ -42,7 +42,7 @@ export function ReviewsSection() {
       >
         <Quote className="absolute top-4 right-4 w-8 h-8 text-[#D4A843]/20" />
 
-        <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="flex items-center justify-between gap-4 mb-4 pr-10">
           <div className="flex gap-1">
             {Array.from({ length: review.rating }).map((_, i) => (
               <Star key={i} className="w-4 h-4 fill-[#D4A843] text-[#D4A843]" />
