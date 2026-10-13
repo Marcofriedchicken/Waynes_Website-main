@@ -249,7 +249,7 @@ export function ServiceCard({
         </ul>
 
         {/* Price */}
-        <div className="flex items-baseline gap-2 mb-5 mt-auto">
+        <div data-nosnippet className="flex items-baseline gap-2 mb-5 mt-auto">
           <span className="text-white/50 text-xs tracking-wider uppercase">Starting at</span>
           {promoDiscount && originalPrice !== undefined && originalPrice !== null ? (
             <div className="flex items-baseline gap-2">

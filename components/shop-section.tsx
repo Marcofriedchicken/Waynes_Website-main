@@ -211,12 +211,12 @@ function ShopCard({ item, index }: { item: any; index: number }) {
                   </p>
 
                   {item.promoDiscount && item.originalPrice !== undefined && item.originalPrice !== null ? (
-                    <div className="flex items-baseline gap-2">
+                    <div data-nosnippet className="flex items-baseline gap-2">
                       <span className="text-white/50 font-semibold text-sm line-through">₱{item.originalPrice.toLocaleString()}</span>
                       <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
                     </div>
                   ) : (
-                    <span className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
+                    <span data-nosnippet className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
                   )}
                 </div>
     </motion.div>
