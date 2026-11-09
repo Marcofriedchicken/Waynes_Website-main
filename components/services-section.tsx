@@ -126,7 +126,7 @@ const serviceMetadata = [
     canUpgradeTo: ["ceramic-coating-3yr", "ceramic-coating-5yr"],
     image: "/images/wax-buffing.jpg",
     features: [
-      "All Express Carwash",
+      "All Essential Carwash",
       "Full Paint Decontamination",
       "Clay bar treatment",
       "Trim Restoration",
@@ -144,7 +144,7 @@ const serviceMetadata = [
     canUpgradeTo: ["ceramic-coating-5yr"],
     image: "/images/ceramic-coating.jpeg",
     features: [
-      "All Express Carwash",
+      "All Essential Carwash",
       "Full Paint Decontamination",
       "Clay bar treatment",
       "Trim Restoration",
@@ -162,7 +162,7 @@ const serviceMetadata = [
     canUpgradeTo: [],
     image: "/images/shop-titanium-ceramic-shield.jpeg",
     features: [
-      "All Express Carwash",
+      "All Essential Carwash",
       "Full Paint Decontamination",
       "Clay bar treatment",
       "Trim Restoration",

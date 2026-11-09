@@ -1,4 +1,4 @@
-function wrapTitle(title: string, maxCharsPerLine = 16, maxLines = 2): string[] {
+function wrapTitle(title: string, maxCharsPerLine = 14, maxLines = 2): string[] {
   const words = title.toUpperCase().split(" ")
   const lines: string[] = []
   let current = ""
