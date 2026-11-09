@@ -68,6 +68,7 @@ const serviceMetadata = [
     features: [
       "All Essential Wash",
       "Interior Dressing",
+      "Asphalt Removal",
       "Back to Zero Sanitation",
       "Trim Restoration",
       "Cabin Fragrance",
@@ -86,6 +87,7 @@ const serviceMetadata = [
     features: [
       "All Essential Wash",
       "Interior Dressing",
+      "Asphalt Removal",
       "Back to Zero Sanitation",
       "Trim Restoration",
       "Cabin Fragrance",
@@ -105,6 +107,7 @@ const serviceMetadata = [
     features: [
       "All Essential Wash",
       "Interior Dressing",
+      "Asphalt Removal",
       "Back to Zero Sanitation",
       "Trim Restoration",
       "Cabin Fragrance",
