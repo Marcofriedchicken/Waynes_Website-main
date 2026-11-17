@@ -228,12 +228,12 @@ export async function GET(request: Request) {
       const slotMin = Number(slotMinStr)
 
       // If duration > 80 mins, last allowed slot is 17:00
-      if (totalDuration > 80 && (slotHour >= 18)) {
+      if (totalDuration > 80 && (slotHour >= 17)) {
         return { time: slot, available: false, reason: "Exceeds operating hours" }
       }
 
       // If completion exceeds close and not overnight-allowed and not the 6pm grace allowed case, mark unavailable
-      const isSixPmGrace = slotHour === 18 && slotMin === 0 && ( (poolId === "A") || isPaint ) && totalDuration <= 80
+      const isSixPmGrace = slotHour === 17 && slotMin === 0 && ( (poolId === "A") || isPaint ) && totalDuration <= 80
       if (!isOvernight && !isSixPmGrace && completionDate.getTime() > new Date(`${date}T${pad(closeHour)}:00:00+08:00`).getTime()) {
         return { time: slot, available: false, reason: "Exceeds operating hours" }
       }

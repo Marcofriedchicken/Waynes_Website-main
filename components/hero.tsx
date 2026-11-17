@@ -108,7 +108,7 @@ export function Hero({ onBookNow }: HeroProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          7AM–7PM <span className="text-[#D4A843] mx-1">•</span> 7 DAYS
+          7AM–6PM <span className="text-[#D4A843] mx-1">•</span> 7 DAYS
         </motion.p>
       </div>
 

@@ -3,7 +3,7 @@ export const TIMEZONE = "Asia/Manila"
 
 export const OPERATING_HOURS = {
   openHour: 7, // 7:00
-  closeHour: 19, // 19:00 (7:00 PM)
+  closeHour: 18, // 18:00 (6:00 PM)
 }
 
 export const POOLS = {
