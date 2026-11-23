@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://waynesdetailing.vercel.app"),
   title: "Wayne's Detailing | Premium Auto Detailing Services in Pasig",
   description: "GET IT DONE - Premium car detailing services including carwash, engine wash, ceramic coating, wax and buffing, and more. Located in Pasig City.",
   keywords: "car detailing, auto detailing, ceramic coating, car wash, Pasig, Pasig City, Philippines",
