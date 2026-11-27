@@ -5,6 +5,7 @@ import { Navbar } from "@/components/navbar"
 import { Hero } from "@/components/hero"
 import { StatsBar } from "@/components/stats-bar"
 import { ServicesSection } from "@/components/services-section"
+import { OurWorkSection } from "@/components/our-work-section"
 import { WhyChooseUs } from "@/components/why-choose-us"
 import { ShopSection } from "@/components/shop-section"
 import { ReviewsSection } from "@/components/reviews-section"
@@ -36,6 +37,7 @@ export default function Home() {
         <Hero onBookNow={() => openBooking()} />
         <StatsBar />
         <ServicesSection onBookService={(id) => openBooking(id)} />
+        <OurWorkSection />
         <WhyChooseUs />
         <ShopSection />
         <ReviewsSection />

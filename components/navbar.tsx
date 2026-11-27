@@ -7,6 +7,7 @@ import { useContactModal } from "@/hooks/use-contact-modal"
 
 const navLinks = [
   { name: "SERVICES", href: "#services" },
+  { name: "OUR WORK", href: "#our-work" },
   { name: "WHY US", href: "#why-us" },
   { name: "SHOP", href: "#shop" },
   { name: "REVIEWS", href: "#reviews" },
@@ -101,7 +102,7 @@ export function Navbar({ onBookNow }: NavbarProps) {
 
             {/* Centered Desktop Navigation */}
             <div className="hidden md:flex items-center justify-center flex-1 px-8">
-              <div className="flex items-center gap-10">
+              <div className="flex items-center gap-5 xl:gap-8">
                 {navLinks.map((link) => (
                   <motion.a
                     key={link.name}
@@ -110,7 +111,7 @@ export function Navbar({ onBookNow }: NavbarProps) {
                     className={
                       link.isButton
                         ? "bg-[#ED0407] text-white px-5 py-2.5 rounded-full font-semibold text-sm transition-all hover:bg-[#ED0407]/90"
-                        : "text-white/80 hover:text-white transition-colors duration-100 font-medium text-sm tracking-wider"
+                        : "text-white/80 hover:text-white transition-colors duration-100 font-medium text-sm tracking-wider whitespace-nowrap"
                     }
                     whileHover={link.isButton ? { scale: 1.02 } : { y: -2, transition: { duration: 0.12 } }}
                   >
