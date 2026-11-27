@@ -4,8 +4,28 @@ import { type MouseEvent } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Phone, MessageCircle, Inbox } from "lucide-react"
 import { useContactModal } from "@/hooks/use-contact-modal"
+import { businessInfo } from "@/lib/site-info"
+
+function MessengerIcon({ className = "w-6 h-6" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.44 3.14 7.17.16.14.26.35.27.57l.05 1.78a.8.8 0 0 0 1.12.71l1.98-.87a.8.8 0 0 1 .53-.04c.91.25 1.88.38 2.91.38 5.64 0 10-4.13 10-9.7S17.64 2 12 2zm6 7.46-2.94 4.66a1.5 1.5 0 0 1-2.17.4l-2.34-1.75a.6.6 0 0 0-.72 0l-3.16 2.4c-.42.32-.97-.18-.69-.63l2.94-4.66a1.5 1.5 0 0 1 2.17-.4l2.34 1.75a.6.6 0 0 0 .72 0l3.16-2.4c.42-.32.97.18.69.63z" />
+    </svg>
+  )
+}
 
 const contactOptions = [
+  {
+    id: "messenger",
+    title: "Messenger",
+    subtitle: "Message us on Facebook",
+    icon: MessengerIcon,
+    bgColor: "bg-sky-500/20",
+    iconColor: "text-sky-400",
+    href: businessInfo.messengerUrl,
+    target: "_blank",
+    rel: "noopener noreferrer",
+  },
   {
     id: "call",
     title: "Call us",
