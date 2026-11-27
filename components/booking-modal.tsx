@@ -517,7 +517,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
                         <h3 className="text-lg font-bold text-gray-900 mb-1">Select your services</h3>
                         <p className="text-gray-500 text-sm">
                           {bookedAddOns.length > 0
-                            ? "Pick one or more, or skip this if you only want your add-ons."
+                            ? "Pick one or more, or skip this if you only want add-ons."
                             : "Pick one or more. Tap again to remove."}
                         </p>
                       </div>
@@ -563,19 +563,36 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
                       ))}
                     </div>
 
-                    {/* Add-ons picked from the Add-ons section */}
-                    {chosenAddOns.length > 0 && (
+                    {/* Add-ons: tap to add as many as you like */}
+                    {allAddOns.some((a) => a.kind === "addon") && (
                       <div className="space-y-2">
-                        <p className="text-xs font-bold text-gray-700 tracking-wider">ADDED TO YOUR BOOKING</p>
+                        <div>
+                          <p className="text-xs font-bold text-gray-700 tracking-wider">ADD-ONS (OPTIONAL)</p>
+                          <p className="text-gray-500 text-xs mt-0.5">Tap to add. Pick as many as you like.</p>
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                          {activeAddOns.map((a) => (
-                            <span key={a.id} className="inline-flex items-center gap-2 rounded-full border border-[#D4A843] bg-[#D4A843]/10 px-3 py-1.5 text-sm font-semibold text-gray-900">
-                              {a.name} <span className="text-[#D4A843]">+₱{a.price.toLocaleString()}</span>
-                              <button type="button" onClick={() => removeAddOn(a.id)} aria-label={`Remove ${a.name}`} className="text-gray-500 hover:text-gray-900">
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </span>
-                          ))}
+                          {allAddOns
+                            .filter((a) => a.kind === "addon" && isAddOnAllowed(a.id))
+                            .map((a) => {
+                              const on = selectedAddOns.includes(a.id)
+                              return (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  onClick={() => (on ? removeAddOn(a.id) : setSelectedAddOns((prev) => [...prev, a.id]))}
+                                  aria-pressed={on}
+                                  className={`inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-semibold transition-all ${
+                                    on
+                                      ? "border-[#D4A843] bg-[#D4A843]/10 text-gray-900"
+                                      : "border-gray-200 text-gray-600 hover:border-gray-300"
+                                  }`}
+                                >
+                                  {on ? <Check className="w-3.5 h-3.5 text-[#D4A843]" /> : <span className="text-gray-400">+</span>}
+                                  {a.name}
+                                  <span className="text-[#D4A843]">₱{a.price.toLocaleString()}</span>
+                                </button>
+                              )
+                            })}
                         </div>
                         {blockedAddOns.length > 0 && selectedServicesData.length > 0 && (
                           <p className="text-xs text-amber-700">
@@ -583,6 +600,25 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
                             {servicesTitle} (it may already be included), so it won&apos;t be added.
                           </p>
                         )}
+                      </div>
+                    )}
+
+                    {/* Merch picked from the Shop section */}
+                    {activeAddOns.some((a) => a.kind === "merch") && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-gray-700 tracking-wider">MERCH IN YOUR BOOKING</p>
+                        <div className="flex flex-wrap gap-2">
+                          {activeAddOns
+                            .filter((a) => a.kind === "merch")
+                            .map((a) => (
+                              <span key={a.id} className="inline-flex items-center gap-2 rounded-full border border-[#D4A843] bg-[#D4A843]/10 px-3 py-1.5 text-sm font-semibold text-gray-900">
+                                {a.name} <span className="text-[#D4A843]">+₱{a.price.toLocaleString()}</span>
+                                <button type="button" onClick={() => removeAddOn(a.id)} aria-label={`Remove ${a.name}`} className="text-gray-500 hover:text-gray-900">
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </span>
+                            ))}
+                        </div>
                       </div>
                     )}
 
