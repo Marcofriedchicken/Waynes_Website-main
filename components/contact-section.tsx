@@ -3,6 +3,7 @@
 import { motion } from "framer-motion"
 import { MapPin, Phone, Mail, Clock, Facebook, Instagram } from "lucide-react"
 import { useContactModal } from "@/hooks/use-contact-modal"
+import { businessInfo } from "@/lib/site-info"
 
 function TikTokIcon({ className = "w-5 h-5" }: { className?: string }) {
   return (
@@ -107,7 +108,8 @@ export function ContactSection({ onBookNow }: ContactSectionProps) {
             {/* Social Links */}
             <div className="flex gap-4 pt-4">
               <motion.a
-                href="https://www.facebook.com/profile.php?id=61586313146954"
+                href={businessInfo.facebookUrl}
+                aria-label="Facebook"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-12 h-12 rounded-xl bg-[#2A2A2A] flex items-center justify-center text-white/60 hover:bg-[#D4A843] hover:text-[#0A0A0A] transition-colors duration-150"
@@ -118,7 +120,10 @@ export function ContactSection({ onBookNow }: ContactSectionProps) {
                 <Facebook className="w-5 h-5" />
               </motion.a>
               <motion.a
-                href="#"
+                href={businessInfo.instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram"
                 className="w-12 h-12 rounded-xl bg-[#2A2A2A] flex items-center justify-center text-white/60 hover:bg-[#D4A843] hover:text-[#0A0A0A] transition-colors duration-150"
                 transition={{ type: "tween", duration: 0.12 }}
                 whileHover={{ scale: 1.06 }}
@@ -127,7 +132,10 @@ export function ContactSection({ onBookNow }: ContactSectionProps) {
                 <Instagram className="w-5 h-5" />
               </motion.a>
               <motion.a
-                href="#"
+                href={businessInfo.tiktokUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="TikTok"
                 className="w-12 h-12 rounded-xl bg-[#2A2A2A] flex items-center justify-center text-white/60 hover:bg-[#D4A843] hover:text-[#0A0A0A] transition-colors duration-150"
                 transition={{ type: "tween", duration: 0.12 }}
                 whileHover={{ scale: 1.06 }}
