@@ -104,6 +104,8 @@ export async function syncBookingToHubSpot(input: HubSpotDealInput) {
   try {
     const contactId = await upsertHubSpotContact(input)
 
+    // Add-ons-only bookings have no service, so the "service" field is left empty
+    const isAddOnOnly = Array.isArray(input.serviceTitles) && input.serviceTitles.length === 0
     const firstService = input.serviceTitles?.[0] || input.serviceTitle
     const properties: Record<string, string | number> = {
       dealname: `${input.customerName} — ${input.serviceTitle}`,
@@ -115,7 +117,9 @@ export async function syncBookingToHubSpot(input: HubSpotDealInput) {
       customer_phone: input.customerPhone,
       // HubSpot's "service" field holds one value, so it gets the first pick;
       // the deal name and "addons" field list everything.
-      service: SERVICE_MAP[firstService] || firstService.toLowerCase().replace(/ /g, "_"),
+      ...(isAddOnOnly
+        ? {}
+        : { service: SERVICE_MAP[firstService] || firstService.toLowerCase().replace(/ /g, "_") }),
       addons: [
         ...(input.serviceTitles && input.serviceTitles.length > 1 ? input.serviceTitles.slice(1) : []),
         ...input.addons.map((a) => a.name),

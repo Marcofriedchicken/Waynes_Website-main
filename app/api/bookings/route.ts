@@ -241,10 +241,11 @@ export async function POST(request: Request) {
 
     // Calculate real prices server-side
     const addonNames = payload.addons.map((a) => a.name)
-    const serviceTitles =
-      Array.isArray(payload.serviceTitles) && payload.serviceTitles.length > 0
-        ? payload.serviceTitles
-        : [payload.serviceTitle]
+    // An empty serviceTitles list means an add-ons-only booking
+    const serviceTitles = Array.isArray(payload.serviceTitles) ? payload.serviceTitles : [payload.serviceTitle]
+    if (serviceTitles.length === 0 && payload.addons.length === 0) {
+      return NextResponse.json({ error: "Pick at least one service or add-on." }, { status: 400 })
+    }
     const calculatedPrices = await calculateRealPrices(
       serviceTitles,
       payload.vehicle.type,

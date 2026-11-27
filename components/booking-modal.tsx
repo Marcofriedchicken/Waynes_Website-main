@@ -167,6 +167,11 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
   const activeAddOns = chosenAddOns.filter((a) => isAddOnAllowed(a.id))
   const blockedAddOns = chosenAddOns.filter((a) => !isAddOnAllowed(a.id))
 
+  // Add-ons (not merch) can be booked on their own, without a service
+  const bookedAddOns = activeAddOns.filter((a) => a.kind === "addon")
+  const isAddOnOnly = selectedServicesData.length === 0 && bookedAddOns.length > 0
+  const bookingTitle = isAddOnOnly ? bookedAddOns.map((a) => a.name).join(" + ") : servicesTitle
+
   const servicesPrice = selectedServicesData.reduce((sum, s) => sum + (priceFor(s) || 0), 0)
 
   const serviceUnavailable =
@@ -207,7 +212,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
     if (step !== 3 || typeof window === "undefined") return ""
     const url = new URL(CALENDLY_URL)
     const notes = [
-      `Service: ${servicesTitle}${vehicleType ? ` (${vehicleType})` : ""}`,
+      `${isAddOnOnly ? "Add-ons only" : "Service"}: ${bookingTitle}${vehicleType ? ` (${vehicleType})` : ""}`,
       activeAddOns.length > 0 ? `Extras: ${activeAddOns.map((a) => a.name).join(", ")}` : "",
       vehicleLabel ? `Vehicle: ${vehicleLabel}` : "",
       `Phone: ${phone}`,
@@ -254,7 +259,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
             customerName: name.trim(),
             customerEmail: email.trim(),
             customerPhone: phone.trim(),
-            serviceTitle: servicesTitle,
+            serviceTitle: bookingTitle,
             serviceTitles: selectedServicesData.map((s) => s.title),
             serviceBasePrice: servicesPrice,
             vehicle: { make: vehicleMake, model: vehicleModel, year: vehicleYear, type: vehicleType },
@@ -304,7 +309,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
         return phone.trim().length >= 10 && name.trim().length >= 2 && /\S+@\S+\.\S+/.test(email.trim())
       case 2:
         return (
-          selectedServices.length > 0 &&
+          (selectedServices.length > 0 || bookedAddOns.length > 0) &&
           !serviceUnavailable &&
           vehicleMake !== "" &&
           vehicleMake !== "Select make" &&
@@ -413,11 +418,11 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
               )}
 
               {/* Selected service + price summary */}
-              {selectedServicesData.length > 0 && step === 3 && vehicleType && (
+              {(selectedServicesData.length > 0 || isAddOnOnly) && step === 3 && vehicleType && (
                 <div className="mt-4 p-3 rounded-lg border-2 border-[#D4A843]/30 bg-[#D4A843]/5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-bold text-gray-900 truncate">{servicesTitle}</p>
+                      <p className="font-bold text-gray-900 truncate">{bookingTitle}</p>
                       <p className="text-xs text-gray-500 mt-1">
                         {vehicleType}
                         {activeAddOns.length > 0 &&
@@ -510,7 +515,11 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
                     <div className="space-y-3">
                       <div>
                         <h3 className="text-lg font-bold text-gray-900 mb-1">Select your services</h3>
-                        <p className="text-gray-500 text-sm">Pick one or more. Tap again to remove.</p>
+                        <p className="text-gray-500 text-sm">
+                          {bookedAddOns.length > 0
+                            ? "Pick one or more, or skip this if you only want your add-ons."
+                            : "Pick one or more. Tap again to remove."}
+                        </p>
                       </div>
                       {serviceUnavailable && (
                         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
@@ -637,7 +646,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
                             </button>
                           ))}
                         </div>
-                        {selectedServicesData.length > 0 && vehicleType && !serviceUnavailable && (
+                        {(selectedServicesData.length > 0 || isAddOnOnly) && vehicleType && !serviceUnavailable && (
                           <div className="mt-3 rounded-xl border border-[#D4A843]/30 bg-[#D4A843]/5 px-4 py-3 text-sm text-gray-700 space-y-1">
                             {selectedServicesData.map((s) => {
                               const tier = s.apiPricing?.[vehicleType]
@@ -695,8 +704,10 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
                       <p className="text-gray-500">Check your email for your confirmation and calendar invite.</p>
                     </div>
                     <div className="bg-gray-50 rounded-xl p-4 text-left space-y-3">
-                      <Row label={selectedServicesData.length > 1 ? "Services" : "Service"} value={servicesTitle} />
-                      {activeAddOns.length > 0 && <Row label="Extras" value={activeAddOns.map((a) => a.name).join(", ")} />}
+                      {!isAddOnOnly && (
+                        <Row label={selectedServicesData.length > 1 ? "Services" : "Service"} value={servicesTitle} />
+                      )}
+                      {activeAddOns.length > 0 && <Row label={isAddOnOnly ? "Add-ons" : "Extras"} value={activeAddOns.map((a) => a.name).join(", ")} />}
                       <Row label="Vehicle" value={vehicleLabel || vehicleType} />
                       {scheduleLabel && <Row label="Schedule" value={scheduleLabel} />}
                       <Row label="Estimated Duration" value={formatDuration(calculateEstimatedDuration())} />
