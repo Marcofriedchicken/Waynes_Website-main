@@ -1,38 +1,39 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Info, Check, ChevronLeft, ChevronRight } from "lucide-react"
+import { X, Info, Check, ChevronLeft } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { services } from "./services-section"
-import { PromoRibbon } from "./promo-ribbon"
 
-function formatPromoEndDate(endDate?: string | null) {
-  if (!endDate) return ""
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(endDate))
-}
+// Calendly booking page shown in the last step. Can be overridden with
+// NEXT_PUBLIC_CALENDLY_URL in Vercel without touching the code.
+const CALENDLY_URL =
+  process.env.NEXT_PUBLIC_CALENDLY_URL || "https://calendly.com/waynesdetailing2026/car-detailing-appointment"
 
 interface BookingModalProps {
   isOpen: boolean
   onClose: () => void
   initialServiceId?: string
+  initialAddOnId?: string
+  initialShopItemId?: string
 }
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6
+// 1-3 are the visible steps; 4 is the "you're booked" screen.
+type Step = 1 | 2 | 3 | 4
+const TOTAL_STEPS = 3
 
 const stepTitles: Record<Step, { title: string; subtitle: string }> = {
-  1: { title: "YOUR PHONE", subtitle: "Your Phone" },
-  2: { title: "SELECT SERVICE", subtitle: "Choose Service" },
-  3: { title: "YOUR VEHICLE(S)", subtitle: "Vehicle Info" },
-  4: { title: "UPGRADES", subtitle: "Customize" },
-  5: { title: "PICK A DATE & TIME", subtitle: "Schedule" },
-  6: { title: "CONFIRMATION", subtitle: "Complete" },
+  1: { title: "YOUR DETAILS", subtitle: "Contact Info" },
+  2: { title: "SERVICE & VEHICLE", subtitle: "Choose Service" },
+  3: { title: "PICK A DATE & TIME", subtitle: "Schedule" },
+  4: { title: "YOU'RE BOOKED", subtitle: "Complete" },
 }
 
 const vehicleMakes = [
-  "Select make", "Audi", "BMW", "Chevrolet", "Ford", "Honda", "Hyundai", 
-  "Isuzu", "Kia", "Mazda", "Mercedes-Benz", "Mitsubishi", "Nissan", 
-  "Subaru", "Suzuki", "Toyota", "Volkswagen", "Other"
+  "Select make", "Audi", "BMW", "Chevrolet", "Ford", "Honda", "Hyundai",
+  "Isuzu", "Kia", "Mazda", "Mercedes-Benz", "Mitsubishi", "Nissan",
+  "Subaru", "Suzuki", "Toyota", "Volkswagen", "Other",
 ]
 
 const vehicleTypes = [
@@ -45,383 +46,151 @@ const vehicleTypes = [
 
 const yearRange = Array.from({ length: 30 }, (_, i) => (2026 - i).toString())
 
-// This will be populated from API
-let addOns: any[] = []
-let merchandise: any[] = []
+// Which add-ons can go with which service (some are already included in a pack).
+const addOnVisibilityByService: Record<string, string[]> = {
+  "essential-wash": ["headlight-restoration", "engine-bay-cleaning", "back-to-zero", "water-spot-treatment", "hydrophobic-treatment"],
+  "premium-wash": ["headlight-restoration", "engine-bay-cleaning", "back-to-zero", "water-spot-treatment", "hydrophobic-treatment"],
+  "bronze-pack": ["headlight-restoration", "engine-bay-cleaning", "water-spot-treatment", "deluxe-interior-detail", "hydrophobic-treatment"],
+  "silver-pack": ["headlight-restoration", "engine-bay-cleaning", "deluxe-interior-detail", "hydrophobic-treatment"],
+  "gold-pack": ["headlight-restoration", "deluxe-interior-detail", "hydrophobic-treatment"],
+  "paint-correction": ["headlight-restoration", "engine-bay-cleaning", "back-to-zero", "deluxe-interior-detail", "hydrophobic-treatment"],
+  "ceramic-coating-3yr": ["headlight-restoration", "engine-bay-cleaning", "back-to-zero", "deluxe-interior-detail"],
+  "ceramic-coating-5yr": ["headlight-restoration", "engine-bay-cleaning", "back-to-zero", "deluxe-interior-detail"],
+}
 
-export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModalProps) {
+type AddOn = {
+  kind: "addon" | "merch"
+  id: string
+  name: string
+  price: number
+  durationMinutes: number
+}
+
+export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId, initialShopItemId }: BookingModalProps) {
   const [step, setStep] = useState<Step>(1)
   const [pricingLoaded, setPricingLoaded] = useState(false)
+  const [allAddOns, setAllAddOns] = useState<AddOn[]>([])
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
   const [phone, setPhone] = useState("")
-  const [selectedService, setSelectedService] = useState(initialServiceId || "")
-  const [baseServiceForUpgrades, setBaseServiceForUpgrades] = useState(initialServiceId || "")
+  const [selectedServices, setSelectedServices] = useState<string[]>(initialServiceId ? [initialServiceId] : [])
+  const [selectedAddOns, setSelectedAddOns] = useState<string[]>(initialAddOnId ? [initialAddOnId] : [])
   const [vehicleMake, setVehicleMake] = useState("")
   const [vehicleModel, setVehicleModel] = useState("")
   const [vehicleYear, setVehicleYear] = useState("")
   const [vehicleType, setVehicleType] = useState("")
-  const [selectedAddOns, setSelectedAddOns] = useState<string[]>([])
-  const [selectedShopItems, setSelectedShopItems] = useState<string[]>([])
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [selectedTime, setSelectedTime] = useState("")
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [availableSlots, setAvailableSlots] = useState<any[]>([])
-  const [loadingSlots, setLoadingSlots] = useState(false)
-  const [slotError, setSlotError] = useState("")
-  const [selectedSlotOvernight, setSelectedSlotOvernight] = useState(false)
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState("")
+  const [calendlyHeight, setCalendlyHeight] = useState(700)
+  const [scheduleLabel, setScheduleLabel] = useState<string | null>(null)
   const [submitNotice, setSubmitNotice] = useState("")
   const contentRef = useRef<HTMLDivElement | null>(null)
+  const bookingSentRef = useRef(false)
 
-  // Load pricing data on mount
+  // Load add-on names/prices
   useEffect(() => {
     async function loadPricingData() {
       try {
-        const res = await fetch('/api/pricing')
+        const res = await fetch("/api/pricing")
         const data = await res.json()
-
-        // Map add-ons with correct display format
-        addOns = (data.addOns || []).map((addon: any) => ({
-          id: addon.slug,
-          name: addon.name,
-          description: addon.name, // Fallback - the API doesn't provide descriptions
-          duration: `${addon.duration_minutes} mins`,
-          price: addon.effective_price ?? 0,
-          durationMinutes: addon.duration_minutes,
-          priceValue: addon.effective_price ?? 0,
-          originalPrice: addon.price,
-          promoDiscount: addon.active_promo_label,
-          promoTitle: addon.promo_label,
-          promoEndDate: addon.promo_end_date,
-        }))
-
-        // Map shop items with correct display format
-        merchandise = (data.shopItems || []).map((item: any) => ({
-          id: item.slug,
-          name: item.name,
-          description: item.name, // Fallback - the API doesn't provide descriptions
-          price: item.effective_price !== undefined && item.effective_price !== null
-            ? `₱${item.effective_price.toLocaleString()}`
-            : '₱0',
-          priceValue: item.effective_price ?? 0,
-          image: "", // The API doesn't provide images; these should be added to Supabase if needed
-          category: item.category,
-          originalPrice: item.price,
-          promoDiscount: item.active_promo_label,
-          promoTitle: item.promo_label,
-          promoEndDate: item.promo_end_date,
-        }))
+        setAllAddOns([
+          ...(data.addOns || []).map((addon: any) => ({
+            kind: "addon" as const,
+            id: addon.slug,
+            name: addon.name,
+            price: addon.effective_price ?? 0,
+            durationMinutes: addon.duration_minutes ?? 0,
+          })),
+          // Merch from the Shop section can be added to a booking too
+          ...(data.shopItems || []).map((item: any) => ({
+            kind: "merch" as const,
+            id: item.slug,
+            name: item.name,
+            price: item.effective_price ?? 0,
+            durationMinutes: 0,
+          })),
+        ])
       } catch (err) {
-        console.error('Failed to load pricing data:', err)
+        console.error("Failed to load pricing data:", err)
       } finally {
         setPricingLoaded(true)
       }
     }
-
     loadPricingData()
   }, [])
 
   useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.scrollTo({ top: 0, behavior: "smooth" })
-    }
+    contentRef.current?.scrollTo({ top: 0, behavior: "smooth" })
   }, [step, isOpen])
 
+  // Pre-select whatever the customer clicked "Book" on
   useEffect(() => {
+    if (!isOpen) return
     if (initialServiceId) {
-      setSelectedService(initialServiceId)
-      setBaseServiceForUpgrades(initialServiceId)
-      setStep(1)
+      setSelectedServices((prev) => (prev.includes(initialServiceId) ? prev : [...prev, initialServiceId]))
     }
-  }, [initialServiceId])
+    const extras = [initialAddOnId, initialShopItemId].filter((id): id is string => Boolean(id))
+    if (extras.length > 0) {
+      setSelectedAddOns((prev) => [...prev, ...extras.filter((id) => !prev.includes(id))])
+    }
+  }, [isOpen, initialServiceId, initialAddOnId, initialShopItemId])
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = "unset"
-    }
+    document.body.style.overflow = isOpen ? "hidden" : "unset"
     return () => {
       document.body.style.overflow = "unset"
     }
   }, [isOpen])
 
-  const handleClose = () => {
-    setStep(1)
-    setPhone("")
-    setSelectedService(initialServiceId || "")
-    setBaseServiceForUpgrades(initialServiceId || "")
-    setVehicleMake("")
-    setVehicleModel("")
-    setVehicleYear("")
-    setVehicleType("")
-    setSelectedAddOns([])
-    setSelectedShopItems([])
-    setSelectedDate(null)
-    setSelectedTime("")
-    setCurrentMonth(new Date())
-    setAvailableSlots([])
-    setLoadingSlots(false)
-    setSlotError("")
-    setName("")
-    setEmail("")
-    setIsSubmitting(false)
-    setSubmitError("")
-    setSubmitNotice("")
-    onClose()
-  }
-
-  const canProceed = () => {
-    if (serviceUnavailable) return false
-
-    switch (step) {
-      case 1:
-        return phone.length >= 10 && name.trim().length >= 2 && email.includes("@")
-      case 2:
-        return selectedService !== ""
-      case 3:
-        return vehicleMake !== "" && vehicleMake !== "Select make" && vehicleType !== ""
-      case 4:
-        return true // Upgrades are optional
-      case 5:
-        return selectedDate !== null && selectedTime !== ""
-      default:
-        return true
-    }
-  }
-
-  const handleContinue = async () => {
-    if (!canProceed()) return
-
-    if (step === 2) {
-      setBaseServiceForUpgrades(selectedService)
-    }
-
-    if (step === 5) {
-      setIsSubmitting(true)
-      setSubmitError("")
-      setSubmitNotice("")
-      try {
-        const selectedAddOnsData = addOns.filter((addon) => selectedAddOns.includes(addon.id))
-
-        const response = await fetch("/api/bookings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customerName: name,
-            customerEmail: email,
-            customerPhone: phone,
-            serviceTitle: selectedServiceData?.title || "",
-            serviceBasePrice: billedServicePrice,
-            vehicle: {
-              make: vehicleMake,
-              model: vehicleModel,
-              year: vehicleYear,
-              type: vehicleType,
-            },
-            addons: [
-              ...selectedAddOnsData.map((addon) => ({
-                name: addon.name,
-                price: addon.price,
-              })),
-              ...selectedShopItemsData.map((item) => ({
-                name: item.name,
-                price: item.priceValue,
-              })),
-            ],
-            appointmentDate: selectedDate ? formatDateForApi(selectedDate) : "",
-            appointmentTime: selectedTime,
-            totalAmount: calculateTotal(),
-            overnight: selectedSlotOvernight,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorPayload = await response.json().catch(() => ({}))
-          throw new Error(errorPayload?.error || "Failed to submit booking.")
-        }
-
-        const result = await response.json().catch(() => null)
-        if (result?.emailSent === false) {
-          setSubmitNotice("Booking continued. Email delivery is pending until SMTP is configured.")
-        }
-        setStep(6)
-      } catch (error) {
-        setSubmitError(error instanceof Error ? error.message : "Failed to submit booking.")
-      } finally {
-        setIsSubmitting(false)
-      }
-      return
-    }
-
-    if (step < 6) {
-      setStep((prev) => (prev + 1) as Step)
-    }
-  }
-
-  const handleBack = () => {
-    if (step > 1) {
-      setStep((prev) => (prev - 1) as Step)
-    }
-  }
-
-  const toggleAddOn = (id: string) => {
-    setSelectedAddOns((prev) =>
-      prev.includes(id) ? prev.filter((addonId) => addonId !== id) : [...prev, id]
-    )
-  }
-
-  const toggleShopItem = (id: string) => {
-    setSelectedShopItems((prev) =>
-      prev.includes(id) ? prev.filter((itemId) => itemId !== id) : [...prev, id]
-    )
-  }
-
   const bookableServices = services.filter(
     (service) => service.prices && Object.keys(service.prices).length > 0,
   )
-  const selectedServiceData = bookableServices.find((s) => s.id === selectedService)
-  const selectedShopItemsData = selectedShopItems
-    .map((itemId) => merchandise.find((item) => item.id === itemId))
-    .filter((item): item is typeof merchandise[number] => Boolean(item))
+  // Customers can pick more than one service
+  const selectedServicesData = selectedServices
+    .map((id) => bookableServices.find((s) => s.id === id))
+    .filter((s): s is (typeof bookableServices)[number] => Boolean(s))
+  const servicesTitle = selectedServicesData.map((s) => s.title).join(" + ")
 
-  const selectedAddOnsData = addOns.filter((addon) => selectedAddOns.includes(addon.id))
-  const addOnVisibilityByService: Record<string, string[]> = {
-    "essential-wash": [
-      "headlight-restoration",
-      "engine-bay-cleaning",
-      "back-to-zero",
-      "water-spot-treatment",
-      "hydrophobic-treatment",
-    ],
-    "premium-wash": [
-      "headlight-restoration",
-      "engine-bay-cleaning",
-      "back-to-zero",
-      "water-spot-treatment",
-      "hydrophobic-treatment",
-    ],
-    "bronze-pack": [
-      "headlight-restoration",
-      "engine-bay-cleaning",
-      "water-spot-treatment",
-      "deluxe-interior-detail",
-      "hydrophobic-treatment",
-    ],
-    "silver-pack": [
-      "headlight-restoration",
-      "engine-bay-cleaning",
-      "deluxe-interior-detail",
-      "hydrophobic-treatment",
-    ],
-    "gold-pack": [
-      "headlight-restoration",
-      "deluxe-interior-detail",
-      "hydrophobic-treatment",
-    ],
-    "paint-correction": [
-      "headlight-restoration",
-      "engine-bay-cleaning",
-      "back-to-zero",
-      "deluxe-interior-detail",
-      "hydrophobic-treatment",
-    ],
-    "ceramic-coating-3yr": [
-      "headlight-restoration",
-      "engine-bay-cleaning",
-      "back-to-zero",
-      "deluxe-interior-detail",
-    ],
-    "ceramic-coating-5yr": [
-      "headlight-restoration",
-      "engine-bay-cleaning",
-      "back-to-zero",
-      "deluxe-interior-detail",
-    ],
-  }
+  const priceFor = (service: (typeof bookableServices)[number]): number | undefined =>
+    vehicleType ? service.prices?.[vehicleType as keyof typeof service.prices] : service.priceValue
 
-  const visibleAddOnIds = addOnVisibilityByService[selectedService]
-  const visibleAddOns = visibleAddOnIds
-    ? addOns.filter((addon) => visibleAddOnIds.includes(addon.id))
-    : addOns
-
-  useEffect(() => {
-    const visibleIds = new Set(visibleAddOns.map((addon) => addon.id))
-    setSelectedAddOns((prev) => prev.filter((id) => visibleIds.has(id)))
-  }, [selectedService])
-
-  const selectedServicePrice = selectedServiceData
-    ? vehicleType
-      ? selectedServiceData.prices?.[vehicleType as keyof typeof selectedServiceData.prices]
-      : selectedServiceData.priceValue
-    : 0
-  const selectedServiceTierPricing = vehicleType
-    ? selectedServiceData?.apiPricing?.[vehicleType]
-    : selectedServiceData?.apiPricing?.["Compact/Hatch"]
-
-  const baseServiceData = bookableServices.find((s) => s.id === baseServiceForUpgrades) || selectedServiceData
-  const baseServiceIsCeramic5yr = baseServiceForUpgrades === "ceramic-coating-5yr"
-  const baseServicePrice = baseServiceData
-    ? vehicleType
-      ? baseServiceData.prices?.[vehicleType as keyof typeof baseServiceData.prices]
-      : baseServiceData.priceValue
-    : 0
-
-  const serviceUnavailable = pricingLoaded && Boolean(selectedService) && (
-    !selectedServiceData ||
-    (vehicleType
-      ? selectedServicePrice === undefined
-      : selectedServiceData.priceValue === undefined)
-  )
-
-  const isPaintCorrectionAdditive =
-    baseServiceForUpgrades === "premium-wash" && selectedService === "paint-correction"
-
-  const billedServicePrice = isPaintCorrectionAdditive
-    ? baseServicePrice + selectedServicePrice
-    : selectedServicePrice
-
-  const calculateTotal = () => {
-    let total = billedServicePrice
-    selectedAddOnsData.forEach((addon) => {
-      total += addon.price
+  // An add-on is allowed if any picked service allows it
+  const isAddOnAllowed = (id: string) => {
+    if (allAddOns.find((a) => a.id === id)?.kind === "merch") return true
+    if (selectedServices.length === 0) return true
+    return selectedServices.some((sid) => {
+      const allowed = addOnVisibilityByService[sid]
+      return !allowed || allowed.includes(id)
     })
-    selectedShopItemsData.forEach((item) => {
-      total += item.priceValue
-    })
-    return total
   }
+  const chosenAddOns = selectedAddOns
+    .map((id) => allAddOns.find((a) => a.id === id))
+    .filter((a): a is AddOn => Boolean(a))
+  const activeAddOns = chosenAddOns.filter((a) => isAddOnAllowed(a.id))
+  const blockedAddOns = chosenAddOns.filter((a) => !isAddOnAllowed(a.id))
+
+  // Add-ons (not merch) can be booked on their own, without a service
+  const bookedAddOns = activeAddOns.filter((a) => a.kind === "addon")
+  const isAddOnOnly = selectedServicesData.length === 0 && bookedAddOns.length > 0
+  const bookingTitle = isAddOnOnly ? bookedAddOns.map((a) => a.name).join(" + ") : servicesTitle
+
+  const servicesPrice = selectedServicesData.reduce((sum, s) => sum + (priceFor(s) || 0), 0)
+
+  const serviceUnavailable =
+    pricingLoaded &&
+    (selectedServicesData.length !== selectedServices.length ||
+      selectedServicesData.some((s) => priceFor(s) === undefined))
+
+  const toggleService = (id: string) =>
+    setSelectedServices((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const calculateTotal = () =>
+    servicesPrice + activeAddOns.reduce((sum, a) => sum + a.price, 0)
+
+  const calculateEstimatedDuration = () =>
+    selectedServicesData.reduce((sum, s) => sum + (s.durationMinutes || 0), 0) + activeAddOns.reduce((sum, a) => sum + a.durationMinutes, 0)
 
   const formatCurrency = (value: number | undefined) => {
-    if (!value || isNaN(value)) return '₱0'
+    if (!value || isNaN(value)) return "₱0"
     return `₱${value.toLocaleString()}`
-  }
-
-  const serviceTotal = calculateTotal()
-
-  const displayServiceTitle = selectedServiceData?.title || ""
-
-  const priceBreakdown = [
-    ...(isPaintCorrectionAdditive && baseServiceData && selectedServiceData
-      ? [
-          { label: baseServiceData.title, value: formatCurrency(baseServicePrice) },
-          { label: `+ ${selectedServiceData.title}`, value: formatCurrency(selectedServicePrice) },
-        ]
-      : selectedServiceData
-      ? [{ label: selectedServiceData.title, value: formatCurrency(selectedServicePrice) }]
-      : []),
-    ...selectedAddOnsData.map((addon) => ({ label: `+ ${addon.name}`, value: formatCurrency(addon.price) })),
-    ...selectedShopItemsData.map((item) => ({ label: `+ ${item.name}`, value: formatCurrency(item.priceValue) })),
-  ]
-
-  const calculateEstimatedDuration = () => {
-    let minutes = selectedServiceData?.durationMinutes || 0
-    selectedAddOnsData.forEach((addon) => {
-      minutes += addon.durationMinutes
-    })
-    return minutes
   }
 
   const formatDuration = (totalMinutes: number) => {
@@ -432,105 +201,161 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
     return `${hours} hr${hours > 1 ? "s" : ""} ${minutes} mins`
   }
 
-  const availableUpgrades = baseServiceData?.canUpgradeTo
-    ?.map((id) => bookableServices.find((service) => service.id === id))
-    .filter((service): service is typeof services[number] => Boolean(service)) || []
+  const vehicleLabel = [vehicleMake !== "Select make" ? vehicleMake : "", vehicleModel, vehicleYear]
+    .filter(Boolean)
+    .join(" ")
 
+  // Calendly embed URL, prefilled so the customer doesn't retype anything.
+  // a1 fills the first question on the Calendly event (by default
+  // "Please share anything that will help prepare for our meeting").
+  const calendlySrc = useMemo(() => {
+    if (step !== 3 || typeof window === "undefined") return ""
+    const url = new URL(CALENDLY_URL)
+    const notes = [
+      `${isAddOnOnly ? "Add-ons only" : "Service"}: ${bookingTitle}${vehicleType ? ` (${vehicleType})` : ""}`,
+      activeAddOns.length > 0 ? `Extras: ${activeAddOns.map((a) => a.name).join(", ")}` : "",
+      vehicleLabel ? `Vehicle: ${vehicleLabel}` : "",
+      `Phone: ${phone}`,
+      `Est. total: ${formatCurrency(calculateTotal())} · Est. time: ${formatDuration(calculateEstimatedDuration())}`,
+    ]
+      .filter(Boolean)
+      .join("\n")
+    url.searchParams.set("embed_domain", window.location.hostname)
+    url.searchParams.set("embed_type", "Inline")
+    url.searchParams.set("hide_gdpr_banner", "1")
+    url.searchParams.set("hide_event_type_details", "1")
+    url.searchParams.set("primary_color", "d4a843")
+    url.searchParams.set("name", name.trim())
+    url.searchParams.set("email", email.trim())
+    url.searchParams.set("a1", notes)
+    return url.toString()
+    // Only rebuild when entering step 3 so the calendar doesn't reload mid-booking
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
+
+  // Listen for Calendly's "booked" message from the embedded calendar
   useEffect(() => {
-    const loadAvailability = async () => {
-      if (!selectedDate || step !== 5) return
+    if (step !== 3) return
 
-      setLoadingSlots(true)
-      setSlotError("")
-      setSelectedTime("")
-      try {
-        const date = formatDateForApi(selectedDate)
-        const params = new URLSearchParams()
-        params.set("date", date)
-        if (selectedServiceData?.title) params.set("serviceTitle", selectedServiceData.title)
-        if (selectedAddOnsData.length > 0) {
-          params.set(
-            "addons",
-            selectedAddOnsData.map((a) => encodeURIComponent(a.name.split("(")[0].trim())).join(","),
-          )
-        }
-        const response = await fetch(`/api/availability?${params.toString()}`)
-        const result = await response.json()
-        if (!response.ok) {
-          throw new Error(result?.error || "Failed to load slots.")
-        }
-        setAvailableSlots(result.slots || [])
-      } catch (error) {
-        setSlotError(error instanceof Error ? error.message : "Failed to load slots.")
-        setAvailableSlots([])
-      } finally {
-        setLoadingSlots(false)
+    const handleMessage = async (e: MessageEvent) => {
+      if (e.origin !== "https://calendly.com") return
+      const data = e.data
+      if (!data || typeof data.event !== "string") return
+
+      if (data.event === "calendly.page_height") {
+        const h = parseInt(String(data.payload?.height || ""), 10)
+        if (h > 300) setCalendlyHeight(h)
+        return
       }
+
+      if (data.event !== "calendly.event_scheduled" || bookingSentRef.current) return
+      bookingSentRef.current = true
+
+      try {
+        const response = await fetch("/api/bookings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerName: name.trim(),
+            customerEmail: email.trim(),
+            customerPhone: phone.trim(),
+            serviceTitle: bookingTitle,
+            serviceTitles: selectedServicesData.map((s) => s.title),
+            serviceBasePrice: servicesPrice,
+            vehicle: { make: vehicleMake, model: vehicleModel, year: vehicleYear, type: vehicleType },
+            addons: activeAddOns.map((a) => ({ name: a.name, price: a.price })),
+            totalAmount: calculateTotal(),
+            calendlyEventUri: data.payload?.event?.uri || "",
+            calendlyInviteeUri: data.payload?.invitee?.uri || "",
+          }),
+        })
+        const result = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(result?.error || "Failed to save booking details.")
+        setScheduleLabel(result?.scheduleLabel || null)
+      } catch (error) {
+        // The slot is already booked in Calendly, so don't block the customer.
+        console.error("Booking details sync failed:", error)
+        setSubmitNotice("Your time slot is booked. If anything looks off, call us at 0917-376-3348.")
+      }
+      setStep(4)
     }
 
-    loadAvailability()
-  }, [selectedDate, step])
+    window.addEventListener("message", handleMessage)
+    return () => window.removeEventListener("message", handleMessage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
 
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear()
-    const month = date.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    const daysInMonth = lastDay.getDate()
-    const startingDay = firstDay.getDay()
-    return { daysInMonth, startingDay }
+  const handleClose = () => {
+    setStep(1)
+    setName("")
+    setEmail("")
+    setPhone("")
+    setSelectedServices([])
+    setSelectedAddOns([])
+    setVehicleMake("")
+    setVehicleModel("")
+    setVehicleYear("")
+    setVehicleType("")
+    setCalendlyHeight(700)
+    setScheduleLabel(null)
+    setSubmitNotice("")
+    bookingSentRef.current = false
+    onClose()
   }
 
-  const isDateAvailable = (day: number) => {
-    const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    return date >= today
-  }
-
-  const isDateSelected = (day: number) => {
-    if (!selectedDate) return false
-    return (
-      selectedDate.getDate() === day &&
-      selectedDate.getMonth() === currentMonth.getMonth() &&
-      selectedDate.getFullYear() === currentMonth.getFullYear()
-    )
-  }
-
-  const handleDateSelect = (day: number) => {
-    if (isDateAvailable(day)) {
-      setSelectedDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day))
+  const canProceed = () => {
+    switch (step) {
+      case 1:
+        return phone.trim().length >= 10 && name.trim().length >= 2 && /\S+@\S+\.\S+/.test(email.trim())
+      case 2:
+        return (
+          (selectedServices.length > 0 || bookedAddOns.length > 0) &&
+          !serviceUnavailable &&
+          vehicleMake !== "" &&
+          vehicleMake !== "Select make" &&
+          vehicleType !== ""
+        )
+      default:
+        return false
     }
   }
 
-  const navigateMonth = (direction: number) => {
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + direction, 1))
+  const handleContinue = () => {
+    if (!canProceed()) return
+
+    // Save the lead in HubSpot right away (after step 1), then update it with
+    // the vehicle after step 2, so nobody is lost if they leave before booking.
+    if (step === 1 || step === 2) {
+      fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: name.trim(),
+          customerEmail: email.trim(),
+          customerPhone: phone.trim(),
+          ...(step === 2
+            ? { vehicle: { make: vehicleMake, model: vehicleModel, year: vehicleYear, type: vehicleType } }
+            : {}),
+        }),
+      }).catch((err) => console.error("Lead capture failed:", err))
+    }
+
+    setStep((prev) => (prev + 1) as Step)
   }
 
-  const formatTimeLabel = (time24: string) => {
-    const [hour, minute] = time24.split(":").map(Number)
-    const ampm = hour >= 12 ? "PM" : "AM"
-    const displayHour = hour % 12 || 12
-    return `${displayHour}:${String(minute).padStart(2, "0")} ${ampm}`
+  const handleBack = () => {
+    if (step > 1 && step < 4) setStep((prev) => (prev - 1) as Step)
   }
 
-  const formatSelectedDate = () => {
-    if (!selectedDate) return ""
-    return selectedDate.toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-    }).toUpperCase()
-  }
+  const removeAddOn = (id: string) => setSelectedAddOns((prev) => prev.filter((a) => a !== id))
 
-  const formatDateForApi = (date: Date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, "0")
-    const day = String(date.getDate()).padStart(2, "0")
-    return `${year}-${month}-${day}`
-  }
+  const priceBreakdown = [
+    ...selectedServicesData.map((s) => ({ label: s.title, value: formatCurrency(priceFor(s)) })),
+    ...activeAddOns.map((a) => ({ label: `+ ${a.name}`, value: formatCurrency(a.price) })),
+  ]
 
-  const { daysInMonth, startingDay } = getDaysInMonth(currentMonth)
+  const inputClass =
+    "w-full px-4 py-4 text-lg border-2 border-[#D4A843] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4A843]/50 text-gray-900 placeholder-gray-400"
 
   return (
     <AnimatePresence>
@@ -553,7 +378,9 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
           {/* Modal */}
           <motion.div
             ref={contentRef}
-            className="relative bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-auto shadow-2xl"
+            className={`relative bg-white rounded-2xl w-full ${
+              step === 3 ? "max-w-3xl" : "max-w-lg"
+            } max-h-[92vh] overflow-auto shadow-2xl transition-[max-width] duration-300`}
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -565,42 +392,47 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                 <h2 className="text-xl font-black text-gray-900">{stepTitles[step].title}</h2>
                 <button
                   onClick={handleClose}
+                  aria-label="Close"
                   className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors"
                 >
                   <X className="w-5 h-5 text-gray-600" />
                 </button>
               </div>
-              <p className="text-gray-500 text-sm">
-                Step {step} of 6 — {stepTitles[step].subtitle}
-              </p>
 
-              {/* Progress Bar */}
-              <div className="flex gap-2 mt-4">
-                {[1, 2, 3, 4, 5, 6].map((s) => (
-                  <div
-                    key={s}
-                    className={`h-1.5 flex-1 rounded-full transition-colors ${
-                      s <= step ? "bg-[#D4A843]" : "bg-gray-200"
-                    }`}
-                  />
-                ))}
-              </div>
+              {step <= TOTAL_STEPS && (
+                <>
+                  <p className="text-gray-500 text-sm">
+                    Step {step} of {TOTAL_STEPS} — {stepTitles[step].subtitle}
+                  </p>
+                  <div className="flex gap-2 mt-4">
+                    {[1, 2, 3].map((s) => (
+                      <div
+                        key={s}
+                        className={`h-1.5 flex-1 rounded-full transition-colors ${
+                          s <= step ? "bg-[#D4A843]" : "bg-gray-200"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
 
-              {/* Selected Service Display */}
-              {selectedServiceData && step >= 3 && vehicleType && (
+              {/* Selected service + price summary */}
+              {(selectedServicesData.length > 0 || isAddOnOnly) && step === 3 && vehicleType && (
                 <div className="mt-4 p-3 rounded-lg border-2 border-[#D4A843]/30 bg-[#D4A843]/5">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-bold text-gray-900 truncate">{displayServiceTitle}</p>
-                      {selectedAddOnsData.length > 0 && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Includes {selectedAddOnsData.length} add-on{selectedAddOnsData.length > 1 ? "s" : ""}
-                        </p>
-                      )}
+                      <p className="font-bold text-gray-900 truncate">{bookingTitle}</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {vehicleType}
+                        {activeAddOns.length > 0 &&
+                          ` · ${activeAddOns.length} extra${activeAddOns.length > 1 ? "s" : ""}`}
+                        {` · ${formatDuration(calculateEstimatedDuration())}`}
+                      </p>
                     </div>
                     <Popover>
                       <div className="flex items-center gap-2">
-                        <span className="text-[#D4A843] font-bold">{formatCurrency(serviceTotal)}</span>
+                        <span className="text-[#D4A843] font-bold">{formatCurrency(calculateTotal())}</span>
                         <PopoverTrigger asChild>
                           <button
                             type="button"
@@ -612,46 +444,27 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                         </PopoverTrigger>
                       </div>
                       <PopoverContent side="bottom" align="end" sideOffset={12} className="w-80 p-0 overflow-hidden">
-                        <div className="bg-white rounded-3xl border border-gray-200 shadow-[0_18px_50px_rgba(15,23,42,0.18)] overflow-hidden">
+                        <div className="bg-white rounded-3xl border border-gray-200 overflow-hidden">
                           <div className="px-5 py-5">
                             <p className="text-lg font-bold text-gray-900">Price Breakdown</p>
-                            <p className="text-sm text-gray-500 mt-1">How your estimate is calculated</p>
+                            <p className="text-sm text-gray-500 mt-1">For a {vehicleType}</p>
                           </div>
-
-                          {vehicleType && (
-                            <div className="mx-5 mb-4 rounded-2xl bg-slate-950 px-4 py-3 text-sm text-white shadow-sm">
-                              <p className="font-semibold">{vehicleType}</p>
-                              {vehicleMake && (
-                                <p className="text-xs text-slate-300">{vehicleMake}</p>
-                              )}
-                            </div>
-                          )}
-
-                          <div className="px-5 pb-4 space-y-3 text-sm text-gray-700">
-                            {priceBreakdown.map((item) => {
-                              const isAddOn = item.label.startsWith("+ ")
-                              return (
-                                <div key={item.label} className="flex justify-between items-center">
-                                  <span className="font-medium text-gray-900">{item.label}</span>
-                                  <span className={`font-semibold ${isAddOn ? "text-emerald-600" : "text-[#D4A843]"}`}>
-                                    {item.value}
-                                  </span>
-                                </div>
-                              )
-                            })}
+                          <div className="px-5 pb-4 space-y-3 text-sm">
+                            {priceBreakdown.map((item) => (
+                              <div key={item.label} className="flex justify-between items-center">
+                                <span className="font-medium text-gray-900">{item.label}</span>
+                                <span className={`font-semibold ${item.label.startsWith("+ ") ? "text-emerald-600" : "text-[#D4A843]"}`}>
+                                  {item.value}
+                                </span>
+                              </div>
+                            ))}
                           </div>
-
                           <div className="border-t border-gray-100 px-5 py-4 bg-gray-50">
-                            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                            <div className="flex items-center justify-between text-sm mb-2">
                               <span className="font-semibold text-gray-900">Estimated Total</span>
-                              <span className="font-bold text-[#D4A843]">{formatCurrency(serviceTotal)}</span>
+                              <span className="font-bold text-[#D4A843]">{formatCurrency(calculateTotal())}</span>
                             </div>
-                            <p className="text-xs text-gray-500 mb-2">
-                              <span className="font-semibold text-gray-900">Est. time:</span> {formatDuration(calculateEstimatedDuration())}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Prices are estimates. Final price confirmed on arrival.
-                            </p>
+                            <p className="text-xs text-gray-500">Prices are estimates. Final price confirmed on arrival.</p>
                           </div>
                         </div>
                       </PopoverContent>
@@ -662,56 +475,32 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
             </div>
 
             {/* Content */}
-            <div className="p-6">
+            <div className={step === 3 ? "px-2 py-2 sm:px-4" : "p-6"}>
               <AnimatePresence mode="wait">
-                {/* Step 1: Phone Number */}
+                {/* Step 1: Contact details */}
                 {step === 1 && (
-                  <motion.div
-                    key="step1"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-4"
-                  >
+                  <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-1">Your phone number</h3>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">Your details</h3>
                       <p className="text-gray-500 text-sm">We&apos;ll send your booking confirmation here.</p>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         Name <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Full Name"
-                        className="w-full px-4 py-4 text-lg border-2 border-[#D4A843] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4A843]/50 text-gray-900 placeholder-gray-400"
-                      />
+                      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Full Name" autoComplete="name" className={inputClass} />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
-                        Email
+                        Email <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="your@email.com"
-                        className="w-full px-4 py-4 text-lg border-2 border-[#D4A843] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4A843]/50 text-gray-900 placeholder-gray-400"
-                      />
+                      <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" autoComplete="email" className={inputClass} />
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">
                         Phone Number <span className="text-red-500">*</span>
                       </label>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="0917 000 0000"
-                        className="w-full px-4 py-4 text-lg border-2 border-[#D4A843] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4A843]/50 text-gray-900 placeholder-gray-400"
-                      />
+                      <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0917 000 0000" autoComplete="tel" className={inputClass} />
                     </div>
                     <p className="text-gray-400 text-xs text-center">
                       By continuing you agree to receive texts & calls about our services.
@@ -719,45 +508,37 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                   </motion.div>
                 )}
 
-                {/* Step 2: Select Service */}
+                {/* Step 2: Service + vehicle */}
                 {step === 2 && (
-                  <motion.div
-                    key="step2"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-4"
-                  >
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-1">Select a service</h3>
-                      <p className="text-gray-500 text-sm">Choose the service you need for your vehicle.</p>
-                    </div>
+                  <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                    {/* Service */}
                     <div className="space-y-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-1">Select your services</h3>
+                        <p className="text-gray-500 text-sm">
+                          {bookedAddOns.length > 0
+                            ? "Pick one or more, or skip this if you only want your add-ons."
+                            : "Pick one or more. Tap again to remove."}
+                        </p>
+                      </div>
                       {serviceUnavailable && (
                         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                          This service is currently unavailable. Please choose another service.
+                          One of your picked services is unavailable for this vehicle. Please remove it or choose another.
                         </div>
                       )}
                       {bookableServices.map((service) => (
                         <button
                           key={service.id}
-                          onClick={() => setSelectedService(service.id)}
-                          className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                            selectedService === service.id
-                              ? "border-[#D4A843] bg-[#D4A843]/5"
-                              : "border-gray-200 hover:border-gray-300"
+                          type="button"
+                          onClick={() => toggleService(service.id)}
+                          className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
+                            selectedServices.includes(service.id) ? "border-[#D4A843] bg-[#D4A843]/5" : "border-gray-200 hover:border-gray-300"
                           }`}
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <div className={`w-12 h-12 rounded-lg overflow-hidden ${
-                                selectedService === service.id ? "ring-2 ring-[#D4A843]" : ""
-                              }`}>
-                                <img 
-                                  src={service.image} 
-                                  alt={service.title}
-                                  className="w-full h-full object-cover"
-                                />
+                              <div className={`w-11 h-11 rounded-lg overflow-hidden ${selectedServices.includes(service.id) ? "ring-2 ring-[#D4A843]" : ""}`}>
+                                <img src={service.image} alt={service.title} className="w-full h-full object-cover" />
                               </div>
                               <div>
                                 <div className="font-semibold text-gray-900">{service.title}</div>
@@ -776,534 +557,202 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
                                 </div>
                               </div>
                             </div>
-                            {selectedService === service.id && (
-                              <Check className="w-5 h-5 text-[#D4A843]" />
-                            )}
+                            {selectedServices.includes(service.id) && <Check className="w-5 h-5 text-[#D4A843]" />}
                           </div>
                         </button>
                       ))}
                     </div>
-                  </motion.div>
-                )}
 
-                {/* Step 3: Vehicle Information */}
-                {step === 3 && (
-                  <motion.div
-                    key="step3"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-5"
-                  >
-                    <p className="text-gray-500 text-sm">Tell us about your vehicle. We&apos;ll customize add-ons for each one next.</p>
-                    
-                    {/* Vehicle Make */}
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 tracking-wider mb-2">
-                        VEHICLE MAKE <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={vehicleMake}
-                        onChange={(e) => setVehicleMake(e.target.value)}
-                        className="w-full px-4 py-4 border-2 border-[#D4A843] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#D4A843]/50 text-gray-900 bg-white appearance-none cursor-pointer"
-                      >
-                        {vehicleMakes.map((make) => (
-                          <option key={make} value={make}>{make}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Vehicle Model */}
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 tracking-wider mb-2">VEHICLE MODEL</label>
-                      <input
-                        type="text"
-                        value={vehicleModel}
-                        onChange={(e) => setVehicleModel(e.target.value)}
-                        placeholder="Select model (optional)"
-                        className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#D4A843] text-gray-900 placeholder-gray-400"
-                      />
-                    </div>
-
-                    {/* Year */}
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 tracking-wider mb-2">YEAR</label>
-                      <select
-                        value={vehicleYear}
-                        onChange={(e) => setVehicleYear(e.target.value)}
-                        className="w-full px-4 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#D4A843] text-gray-900 bg-white appearance-none cursor-pointer"
-                      >
-                        <option value="">Select year</option>
-                        {yearRange.map((year) => (
-                          <option key={year} value={year}>{year}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Vehicle Type */}
-                    <div>
-                      <div className="flex items-center gap-4 mb-3">
-                        <div className="flex-1 h-px bg-gray-200" />
-                        <span className="text-xs font-bold text-gray-500 tracking-wider">
-                          VEHICLE TYPE <span className="text-red-500">*</span>
-                        </span>
-                        <div className="flex-1 h-px bg-gray-200" />
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {vehicleTypes.map((type) => (
-                          <button
-                            key={type}
-                            onClick={() => setVehicleType(type)}
-                            className={`p-3 rounded-xl border-2 text-center text-xs font-bold transition-all ${
-                              vehicleType === type
-                                ? "border-[#D4A843] bg-[#D4A843]/5 text-gray-900"
-                                : "border-gray-200 text-gray-600 hover:border-gray-300"
-                            }`}
-                          >
-                            {type}
-                          </button>
-                        ))}
-                      </div>
-                      {selectedServiceData && vehicleType && selectedServicePrice !== undefined ? (
-                        <div className="mt-3 rounded-xl border border-[#D4A843]/30 bg-[#D4A843]/5 px-4 py-3 text-sm text-gray-700">
-                          {selectedServiceData.title} for <span className="font-semibold">{vehicleType}</span>:{" "}
-                          {selectedServiceTierPricing?.active_promo_label && (
-                            <span className="mr-2 text-gray-400 line-through">
-                              ₱{selectedServiceTierPricing.price.toLocaleString()}
+                    {/* Add-ons picked from the Add-ons section */}
+                    {chosenAddOns.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-gray-700 tracking-wider">ADDED TO YOUR BOOKING</p>
+                        <div className="flex flex-wrap gap-2">
+                          {activeAddOns.map((a) => (
+                            <span key={a.id} className="inline-flex items-center gap-2 rounded-full border border-[#D4A843] bg-[#D4A843]/10 px-3 py-1.5 text-sm font-semibold text-gray-900">
+                              {a.name} <span className="text-[#D4A843]">+₱{a.price.toLocaleString()}</span>
+                              <button type="button" onClick={() => removeAddOn(a.id)} aria-label={`Remove ${a.name}`} className="text-gray-500 hover:text-gray-900">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
                             </span>
-                          )}
-                          <span className="font-bold text-[#D4A843]">₱{selectedServicePrice.toLocaleString()}</span>
+                          ))}
                         </div>
-                      ) : serviceUnavailable ? (
-                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                          This service is currently unavailable. Please choose another service.
-                        </div>
-                      ) : null}
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Step 4: Upgrades & Add-ons */}
-                {step === 4 && (
-                  <motion.div
-                    key="step4"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-5"
-                  >
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-1">
-                        {baseServiceIsCeramic5yr ? "Add-ons & Merch" : "Upgrades, Add-ons & Merch"}
-                      </h3>
-                      <p className="text-gray-500 text-sm">
-                        {baseServiceIsCeramic5yr
-                          ? "Choose your add-ons and merch for this vehicle."
-                          : "Select an upgrade based on the chosen vehicle type, then add optional services and merch."}
-                      </p>
-                    </div>
-
-                    {!baseServiceIsCeramic5yr && (
-                      <div className="space-y-4">
-                        {availableUpgrades.length > 0 ? (
-                          availableUpgrades.map((upgrade) => {
-                            const upgradePrice = vehicleType
-                              ? upgrade.prices?.[vehicleType as keyof typeof upgrade.prices]
-                              : upgrade.priceValue
-                            if (upgradePrice === undefined) return null
-                            const upgradePricing = vehicleType
-                              ? upgrade.apiPricing?.[vehicleType]
-                              : upgrade.apiPricing?.["Compact/Hatch"]
-                            const priceDifference = Math.max(upgradePrice - baseServicePrice, 0)
-                            const showAsAdditional =
-                              baseServiceForUpgrades === "premium-wash" && upgrade.id === "paint-correction"
-
-                            return (
-                              <button
-                                key={upgrade.id}
-                                onClick={() =>
-                                  setSelectedService((prev) =>
-                                    prev === upgrade.id ? baseServiceForUpgrades : upgrade.id
-                                  )
-                                }
-                                className={`w-full rounded-2xl border-2 p-4 text-left transition-all ${
-                                  selectedService === upgrade.id
-                                    ? "border-[#D4A843] bg-[#D4A843]/5"
-                                    : "border-gray-200 hover:border-gray-300"
-                                }`}
-                              >
-                                <div className="flex gap-4">
-                                  <div className="w-20 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                                    <img
-                                      src={upgrade.image}
-                                      alt={upgrade.title}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-center justify-between gap-3">
-                                      <h4 className="font-bold text-gray-900">{upgrade.title}</h4>
-                                      <span className="text-[#D4A843] font-bold inline-flex items-baseline gap-2">
-                                        {upgradePricing?.active_promo_label && (
-                                          <span className="text-sm text-gray-400 line-through">
-                                            ₱{upgradePricing.price.toLocaleString()}
-                                          </span>
-                                        )}
-                                        <span>
-                                          {showAsAdditional ? "+" : ""}₱{upgradePrice.toLocaleString()}
-                                        </span>
-                                      </span>
-                                    </div>
-                                    <p className="text-gray-500 text-sm mt-1">{upgrade.description}</p>
-                                    <p className="text-[#D4A843] text-xs mt-2 font-medium">
-                                      {upgrade.duration}
-                                      {vehicleType ? ` • ${vehicleType} price shown` : ""}
-                                    </p>
-                                  </div>
-                                </div>
-                              </button>
-                            )
-                          })
-                        ) : (
-                          <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-gray-600">
-                            No upgrades are available for this service.
-                          </div>
+                        {blockedAddOns.length > 0 && selectedServicesData.length > 0 && (
+                          <p className="text-xs text-amber-700">
+                            {blockedAddOns.map((a) => a.name).join(", ")} {blockedAddOns.length > 1 ? "aren't" : "isn't"} available with{" "}
+                            {servicesTitle} (it may already be included), so it won&apos;t be added.
+                          </p>
                         )}
                       </div>
                     )}
 
-                    <div className="space-y-3 pt-4">
-                      <div className="flex items-center justify-between mb-3">
+                    {/* Vehicle */}
+                    <div className="space-y-4 pt-2 border-t border-gray-100">
+                      <h3 className="text-lg font-bold text-gray-900 pt-4">Your vehicle</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                          <h4 className="text-base font-bold text-gray-900">Add-ons</h4>
-                          <p className="text-gray-500 text-sm">Available for all vehicle types.</p>
-                        </div>
-                        <span className="text-xs text-gray-500 uppercase tracking-[0.2em]">All Types</span>
-                      </div>
-
-                      <div className="grid gap-3">
-                        {visibleAddOns.map((addon) => {
-                          const selected = selectedAddOns.includes(addon.id)
-                          return (
-                            <button
-                              key={addon.id}
-                              type="button"
-                              onClick={() => toggleAddOn(addon.id)}
-                              className={`relative w-full overflow-visible rounded-2xl border p-4 text-left transition-all ${
-                                selected ? "border-[#D4A843] bg-[#D4A843]/5" : "border-gray-200 hover:border-gray-300"
-                              }`}
-                            >
-                              {addon.promoDiscount && (
-                                <PromoRibbon
-                                  title={addon.promoTitle || "SALE"}
-                                  discount={addon.promoDiscount}
-                                  endDate={formatPromoEndDate(addon.promoEndDate)}
-                                />
-                              )}
-                              <div className="flex items-center justify-between gap-4">
-                                <div>
-                                  <h5 className="font-semibold text-gray-900">{addon.name}</h5>
-                                  <p className="text-gray-500 text-sm mt-1">{addon.description}</p>
-                                </div>
-                                <div className="text-right">
-                                  <div className="flex flex-col items-end">
-                                    <div className="text-[#D4A843] font-bold flex items-baseline gap-1">
-                                      <span>+</span>
-                                      {addon.promoDiscount && addon.originalPrice !== undefined && addon.originalPrice !== null ? (
-                                        <>
-                                          <span className="text-sm text-gray-400 line-through">₱{addon.originalPrice.toLocaleString()}</span>
-                                          <span className="text-[#D4A843]">₱{addon.price.toLocaleString()}</span>
-                                        </>
-                                      ) : (
-                                        <span>₱{addon.price.toLocaleString()}</span>
-                                      )}
-                                    </div>
-                                    <p className="text-xs text-[#D4A843] font-medium">{addon.duration}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="pt-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-900">Merch</h3>
-                          <p className="text-gray-500 text-sm">Still available no matter which vehicle type you pick.</p>
-                        </div>
-                        <span className="text-xs text-gray-500 uppercase tracking-[0.2em]">All Types</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {merchandise.map((item) => {
-                          const selected = selectedShopItems.includes(item.id)
-                          return (
-                            <button
-                              key={item.id}
-                              onClick={() => toggleShopItem(item.id)}
-                              className={`relative overflow-visible rounded-2xl border p-4 text-left transition-all ${
-                                selected ? "border-[#D4A843] bg-[#FDF7E4]" : "border-gray-200 bg-white hover:border-gray-300"
-                              }`}
-                            >
-                              {item.promoDiscount && (
-                                <PromoRibbon
-                                  title={item.promoTitle || "SALE"}
-                                  discount={item.promoDiscount}
-                                  endDate={formatPromoEndDate(item.promoEndDate)}
-                                />
-                              )}
-                              <span className="absolute top-7 right-3 z-50 pointer-events-none text-[#D4A843] font-bold inline-flex items-baseline gap-1">
-                                <span className="text-sm">+</span>
-                                {item.promoDiscount && item.originalPrice !== undefined && item.originalPrice !== null ? (
-                                  <>
-                                    <span className="text-sm text-gray-400 line-through">₱{item.originalPrice.toLocaleString()}</span>
-                                    <span>{item.price}</span>
-                                  </>
-                                ) : (
-                                  <span>{item.price}</span>
-                                )}
-                              </span>
-
-                              <div className="flex items-start gap-3">
-                                <div className="pr-8 flex-1">
-                                  <h4 className="font-bold text-gray-900">{item.name}</h4>
-                                  <p className="text-gray-500 text-sm mt-1 line-clamp-2">{item.description}</p>
-                                </div>
-                              </div>
-                              <div className="mt-4 flex items-center justify-between">
-                                <span className="text-xs uppercase tracking-[0.2em] text-gray-500">{item.category}</span>
-                                <span className={`text-[11px] font-bold uppercase px-2 py-1 rounded-full ${
-                                  selected ? "bg-[#D4A843] text-white" : "bg-[#F3F4F6] text-gray-700"
-                                }`}>
-                                  {selected ? "SELECTED" : "ADD"}
-                                </span>
-                              </div>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* Step 5: Live Calendar Scheduling */}
-                {step === 5 && (
-                  <motion.div
-                    key="step5"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-4"
-                  >
-                    <div className="bg-gray-900 rounded-xl overflow-hidden">
-                      <div className="flex items-center justify-between p-4">
-                        <button
-                          onClick={() => navigateMonth(-1)}
-                          className="w-10 h-10 rounded-full border-2 border-[#D4A843] flex items-center justify-center text-white hover:bg-[#D4A843]/20 transition-colors"
-                        >
-                          <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <h3 className="text-white font-bold text-lg">
-                          {currentMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                        </h3>
-                        <button
-                          onClick={() => navigateMonth(1)}
-                          className="w-10 h-10 rounded-full border-2 border-[#D4A843] flex items-center justify-center text-white hover:bg-[#D4A843]/20 transition-colors"
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-7 bg-white/5">
-                        {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((day) => (
-                          <div key={day} className="p-2 text-center text-xs font-bold text-gray-400">
-                            {day}
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="grid grid-cols-7 bg-white">
-                        {Array.from({ length: startingDay }).map((_, i) => (
-                          <div key={`empty-${i}`} className="p-3" />
-                        ))}
-                        {Array.from({ length: daysInMonth }).map((_, i) => {
-                          const day = i + 1
-                          const available = isDateAvailable(day)
-                          const selected = isDateSelected(day)
-                          return (
-                            <button
-                              key={day}
-                              onClick={() => handleDateSelect(day)}
-                              disabled={!available}
-                              className={`p-3 text-center relative transition-all ${
-                                selected
-                                  ? "bg-[#D4A843] text-gray-900 font-bold"
-                                  : available
-                                    ? "text-gray-900 hover:bg-gray-100"
-                                    : "text-gray-300"
-                              }`}
-                            >
-                              {day}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    {selectedDate && (
-                      <>
-                        <div className="flex items-center gap-4">
-                          <div className="flex-1 h-px bg-gray-200" />
-                          <span className="text-xs font-bold text-gray-500 tracking-wider">
-                            {formatSelectedDate()}
-                          </span>
-                          <div className="flex-1 h-px bg-gray-200" />
-                        </div>
-                        {loadingSlots ? (
-                          <div className="text-sm text-gray-500">Loading available slots...</div>
-                        ) : (
-                          <div className="grid grid-cols-3 gap-2">
-                            {availableSlots.map((slot) => (
-                              <button
-                                key={slot.time}
-                                onClick={() => {
-                                  if (!slot.available) return
-                                  setSelectedTime(slot.time)
-                                  setSelectedSlotOvernight(Boolean(slot.overnight))
-                                }}
-                                disabled={!slot.available}
-                                title={!slot.available ? slot.reason || "Unavailable" : undefined}
-                                className={`p-3 rounded-xl border-2 text-center text-sm font-medium transition-all ${
-                                  selectedTime === slot.time
-                                    ? "border-[#D4A843] bg-[#D4A843]/5 text-gray-900"
-                                    : slot.available
-                                    ? "border-gray-200 text-gray-600 hover:border-gray-300"
-                                    : "border-gray-200 text-gray-300 cursor-not-allowed"
-                                }`}
-                              >
-                                <div className="font-medium">{formatTimeLabel(slot.time)}</div>
-                                <div className="text-xs mt-1 text-gray-500">
-                                  {slot.overnight ? "Next-day pickup" : slot.completion ? `Done by ${formatTimeLabel(slot.completion)}` : ""}
-                                </div>
-                              </button>
+                          <label className="block text-xs font-bold text-gray-700 tracking-wider mb-2">
+                            MAKE <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            value={vehicleMake}
+                            onChange={(e) => setVehicleMake(e.target.value)}
+                            className="w-full px-4 py-3 border-2 border-[#D4A843] rounded-xl focus:outline-none text-gray-900 bg-white cursor-pointer"
+                          >
+                            {vehicleMakes.map((make) => (
+                              <option key={make} value={make}>{make}</option>
                             ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-700 tracking-wider mb-2">YEAR</label>
+                          <select
+                            value={vehicleYear}
+                            onChange={(e) => setVehicleYear(e.target.value)}
+                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#D4A843] text-gray-900 bg-white cursor-pointer"
+                          >
+                            <option value="">Select year</option>
+                            {yearRange.map((year) => (
+                              <option key={year} value={year}>{year}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 tracking-wider mb-2">MODEL</label>
+                        <input
+                          type="text"
+                          value={vehicleModel}
+                          onChange={(e) => setVehicleModel(e.target.value)}
+                          placeholder="e.g. Vios (optional)"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-[#D4A843] text-gray-900 placeholder-gray-400"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-gray-700 tracking-wider mb-2">
+                          VEHICLE TYPE <span className="text-red-500">*</span>
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {vehicleTypes.map((type) => (
+                            <button
+                              key={type}
+                              type="button"
+                              onClick={() => setVehicleType(type)}
+                              className={`p-3 rounded-xl border-2 text-center text-xs font-bold transition-all ${
+                                vehicleType === type ? "border-[#D4A843] bg-[#D4A843]/5 text-gray-900" : "border-gray-200 text-gray-600 hover:border-gray-300"
+                              }`}
+                            >
+                              {type}
+                            </button>
+                          ))}
+                        </div>
+                        {(selectedServicesData.length > 0 || isAddOnOnly) && vehicleType && !serviceUnavailable && (
+                          <div className="mt-3 rounded-xl border border-[#D4A843]/30 bg-[#D4A843]/5 px-4 py-3 text-sm text-gray-700 space-y-1">
+                            {selectedServicesData.map((s) => {
+                              const tier = s.apiPricing?.[vehicleType]
+                              return (
+                                <div key={s.id} className="flex justify-between gap-3">
+                                  <span>{s.title}</span>
+                                  <span>
+                                    {tier?.active_promo_label && (
+                                      <span className="mr-2 text-gray-400 line-through">₱{tier.price.toLocaleString()}</span>
+                                    )}
+                                    <span className="font-bold text-[#D4A843]">{formatCurrency(priceFor(s))}</span>
+                                  </span>
+                                </div>
+                              )
+                            })}
+                            {activeAddOns.map((a) => (
+                              <div key={a.id} className="flex justify-between gap-3">
+                                <span>+ {a.name}</span>
+                                <span className="font-bold text-[#D4A843]">{formatCurrency(a.price)}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between gap-3 border-t border-[#D4A843]/30 pt-1 font-semibold text-gray-900">
+                              <span>Estimated total ({vehicleType})</span>
+                              <span className="text-[#D4A843]">{formatCurrency(calculateTotal())}</span>
+                            </div>
                           </div>
                         )}
-                        {!loadingSlots && availableSlots.length === 0 && !slotError && (
-                          <p className="text-sm text-gray-500">No available slots for this date.</p>
-                        )}
-                      </>
-                    )}
-                    {slotError && <p className="text-sm text-red-600">{slotError}</p>}
-                    {submitError && <p className="text-sm text-red-600">{submitError}</p>}
-                    {submitNotice && <p className="text-sm text-amber-700">{submitNotice}</p>}
+                      </div>
+                    </div>
                   </motion.div>
                 )}
 
-                {/* Step 6: Confirmation */}
-                {step === 6 && (
-                  <motion.div
-                    key="step6"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className="space-y-6 text-center"
-                  >
+                {/* Step 3: Calendly */}
+                {step === 3 && (
+                  <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                    {calendlySrc && (
+                      <iframe
+                        src={calendlySrc}
+                        title="Pick a date and time"
+                        className="w-full border-0"
+                        style={{ height: calendlyHeight, minHeight: 650 }}
+                      />
+                    )}
+                  </motion.div>
+                )}
+
+                {/* Done */}
+                {step === 4 && (
+                  <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6 text-center">
                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                       <Check className="w-10 h-10 text-green-600" />
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h3>
-                      <p className="text-gray-500">We&apos;ve sent a confirmation email to you and our team.</p>
+                      <p className="text-gray-500">Check your email for your confirmation and calendar invite.</p>
                     </div>
                     <div className="bg-gray-50 rounded-xl p-4 text-left space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Service</span>
-                        <span className="font-semibold text-gray-900">{selectedServiceData?.title}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Vehicle</span>
-                        <span className="font-semibold text-gray-900">{vehicleMake} {vehicleModel}</span>
-                      </div>
-                      {selectedSlotOvernight && (
-                        <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-700">Your vehicle will be ready for pickup the following day. Our team will contact you to confirm your pickup time.</div>
+                      {!isAddOnOnly && (
+                        <Row label={selectedServicesData.length > 1 ? "Services" : "Service"} value={servicesTitle} />
                       )}
-                      {selectedAddOnsData.length > 0 && (
-                        <div className="flex justify-between items-start gap-4">
-                          <span className="text-gray-500">Selected Add-ons</span>
-                          <span className="font-semibold text-gray-900 text-right">
-                            {selectedAddOnsData.map((addon) => addon.name).join(", ")}
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Schedule</span>
-                        <span className="font-semibold text-gray-900">
-                          {selectedDate
-                            ? `${selectedDate.toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })} ${formatTimeLabel(selectedTime)}`
-                            : "N/A"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Estimated Duration</span>
-                        <span className="font-semibold text-gray-900">
-                          {formatDuration(calculateEstimatedDuration())}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Phone</span>
-                        <span className="font-semibold text-gray-900">{phone}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Email</span>
-                        <span className="font-semibold text-gray-900">{email}</span>
-                      </div>
+                      {activeAddOns.length > 0 && <Row label={isAddOnOnly ? "Add-ons" : "Extras"} value={activeAddOns.map((a) => a.name).join(", ")} />}
+                      <Row label="Vehicle" value={vehicleLabel || vehicleType} />
+                      {scheduleLabel && <Row label="Schedule" value={scheduleLabel} />}
+                      <Row label="Estimated Duration" value={formatDuration(calculateEstimatedDuration())} />
+                      <Row label="Phone" value={phone} />
                       <div className="pt-3 border-t border-gray-200 flex justify-between">
-                        <span className="text-gray-900 font-bold">Total</span>
-                        <span className="font-bold text-[#D4A843]">₱{calculateTotal().toLocaleString()}</span>
+                        <span className="text-gray-900 font-bold">Estimated Total</span>
+                        <span className="font-bold text-[#D4A843]">{formatCurrency(calculateTotal())}</span>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-400">
-                      Questions? Call us at 0917-376-3348
-                    </p>
+                    {submitNotice && <p className="text-sm text-amber-700">{submitNotice}</p>}
+                    <p className="text-sm text-gray-400">Questions? Call us at 0917-376-3348</p>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
 
-
             {/* Footer */}
             <div className="sticky bottom-0 bg-white p-6 pt-4 border-t border-gray-100">
-              {step < 6 ? (
+              {step < 3 ? (
                 <div className="flex items-center gap-4">
                   {step > 1 && (
-                    <button
-                      onClick={handleBack}
-                      className="flex items-center gap-1 text-gray-500 hover:text-gray-700 font-medium"
-                    >
+                    <button onClick={handleBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 font-medium">
                       <ChevronLeft className="w-4 h-4" />
                       BACK
                     </button>
                   )}
                   <motion.button
                     onClick={handleContinue}
-                    disabled={!canProceed() || isSubmitting}
+                    disabled={!canProceed()}
                     className={`flex-1 py-4 rounded-full font-bold text-lg transition-all ${
-                      canProceed() && !isSubmitting
-                        ? "bg-[#D4A843] hover:bg-[#D4A843]/90 text-gray-900"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      canProceed() ? "bg-[#D4A843] hover:bg-[#D4A843]/90 text-gray-900" : "bg-gray-200 text-gray-400 cursor-not-allowed"
                     }`}
-                    whileHover={canProceed() && !isSubmitting ? { scale: 1.02 } : {}}
-                    whileTap={canProceed() && !isSubmitting ? { scale: 0.98 } : {}}
+                    whileHover={canProceed() ? { scale: 1.02 } : {}}
+                    whileTap={canProceed() ? { scale: 0.98 } : {}}
                   >
-                    {isSubmitting ? "SENDING..." : "CONTINUE →"}
+                    {step === 2 ? "PICK A DATE →" : "CONTINUE →"}
                   </motion.button>
+                </div>
+              ) : step === 3 ? (
+                <div className="flex items-center justify-between gap-4">
+                  <button onClick={handleBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 font-medium">
+                    <ChevronLeft className="w-4 h-4" />
+                    BACK
+                  </button>
+                  <p className="text-xs text-gray-400 text-right">Pick a time above to confirm your booking.</p>
                 </div>
               ) : (
                 <motion.button
@@ -1320,5 +769,14 @@ export function BookingModal({ isOpen, onClose, initialServiceId }: BookingModal
         </motion.div>
       )}
     </AnimatePresence>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between items-start gap-4">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-semibold text-gray-900 text-right">{value}</span>
+    </div>
   )
 }

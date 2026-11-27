@@ -6,6 +6,7 @@ import { Hero } from "@/components/hero"
 import { PromoSection } from "@/components/promo-section"
 import { StatsBar } from "@/components/stats-bar"
 import { ServicesSection } from "@/components/services-section"
+import { AddOnsSection } from "@/components/add-ons-section"
 import { OurWorkSection } from "@/components/our-work-section"
 import { WhyChooseUs } from "@/components/why-choose-us"
 import { ShopSection } from "@/components/shop-section"
@@ -20,15 +21,21 @@ import { ContactModalProvider } from "@/hooks/use-contact-modal"
 export default function Home() {
   const [isBookingOpen, setIsBookingOpen] = useState(false)
   const [selectedServiceId, setSelectedServiceId] = useState<string | undefined>()
+  const [selectedAddOnId, setSelectedAddOnId] = useState<string | undefined>()
+  const [selectedShopItemId, setSelectedShopItemId] = useState<string | undefined>()
 
-  const openBooking = (serviceId?: string) => {
+  const openBooking = (serviceId?: string, addOnId?: string, shopItemId?: string) => {
     setSelectedServiceId(serviceId)
+    setSelectedAddOnId(addOnId)
+    setSelectedShopItemId(shopItemId)
     setIsBookingOpen(true)
   }
 
   const closeBooking = () => {
     setIsBookingOpen(false)
     setSelectedServiceId(undefined)
+    setSelectedAddOnId(undefined)
+    setSelectedShopItemId(undefined)
   }
 
   return (
@@ -39,9 +46,10 @@ export default function Home() {
         <PromoSection />
         <StatsBar />
         <ServicesSection onBookService={(id) => openBooking(id)} />
+        <AddOnsSection onBookAddOn={(id) => openBooking(undefined, id)} />
         <OurWorkSection />
         <WhyChooseUs />
-        <ShopSection />
+        <ShopSection onAddToBooking={(id) => openBooking(undefined, undefined, id)} />
         <ReviewsSection />
         <FindUsSection />
         <ContactSection onBookNow={() => openBooking()} />
@@ -51,6 +59,8 @@ export default function Home() {
           isOpen={isBookingOpen}
           onClose={closeBooking}
           initialServiceId={selectedServiceId}
+          initialAddOnId={selectedAddOnId}
+          initialShopItemId={selectedShopItemId}
         />
         <ContactModal />
       </main>

@@ -8,6 +8,7 @@ import { PromoBanner } from "@/components/promo-banner"
 
 const navLinks = [
   { name: "SERVICES", href: "#services" },
+  { name: "ADD-ONS", href: "#add-ons" },
   { name: "OUR WORK", href: "#our-work" },
   { name: "WHY US", href: "#why-us" },
   { name: "SHOP", href: "#shop" },

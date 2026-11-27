@@ -44,7 +44,7 @@ function formatPromoEndDate(endDate?: string | null) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(endDate))
 }
 
-export function ShopSection() {
+export function ShopSection({ onAddToBooking }: { onAddToBooking?: (itemId: string) => void }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -125,7 +125,7 @@ export function ShopSection() {
             <div className="col-span-full text-center text-white/50">Loading...</div>
           ) : (
             merchandise.map((item, index) => (
-              <ShopCard key={item.id} item={item} index={index} />
+              <ShopCard key={item.id} item={item} index={index} onAddToBooking={onAddToBooking} />
             ))
           )}
         </div>
@@ -138,7 +138,7 @@ export function ShopSection() {
           viewport={{ once: true }}
         >
           <p className="text-white/70 text-sm md:text-base max-w-2xl mx-auto leading-relaxed">
-            Shop our official gear or collect it in person at the studio for a premium detailing experience and a brand you can rep with pride.
+            Add any item to your booking and pick it up at the shop when you drop off your car.
           </p>
         </motion.div>
       </div>
@@ -146,7 +146,7 @@ export function ShopSection() {
   )
 }
 
-function ShopCard({ item, index }: { item: any; index: number }) {
+function ShopCard({ item, index, onAddToBooking }: { item: any; index: number; onAddToBooking?: (itemId: string) => void }) {
   const [hovered, setHovered] = useState(false)
   const [active, setActive] = useState(false)
   const highlighted = hovered || active
@@ -217,6 +217,19 @@ function ShopCard({ item, index }: { item: any; index: number }) {
                     </div>
                   ) : (
                     <span data-nosnippet className="block text-[#D4A843] font-bold text-xl">{item.price}</span>
+                  )}
+
+                  {onAddToBooking && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onAddToBooking(item.id)
+                      }}
+                      className="mt-4 w-full rounded-full bg-[#D4A843] py-2.5 text-sm font-bold text-gray-900 hover:bg-[#D4A843]/90 transition-colors"
+                    >
+                      ADD TO MY BOOKING
+                    </button>
                   )}
                 </div>
     </motion.div>

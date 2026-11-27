@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { Resend } from "resend"
 import { getCalendarClient, getCalendarId } from "@/lib/google-calendar"
+import { syncBookingToHubSpot } from "@/lib/hubspot"
 import {
   appendBookingToSheet,
   generateBookingId,
@@ -24,6 +25,8 @@ type BookingPayload = {
   customerEmail: string
   customerPhone: string
   serviceTitle: string
+  // When the customer picks several services
+  serviceTitles?: string[]
   serviceBasePrice: number
   vehicle: {
     make: string
@@ -36,6 +39,10 @@ type BookingPayload = {
   appointmentTime: string
   totalAmount: number
   overnight?: boolean
+  // Set when the time was booked through the Calendly embed
+  calendlyEventUri?: string
+  calendlyInviteeUri?: string
+  appointmentStartIso?: string | null
 }
 
 const currency = (value: number) => `PHP ${value.toLocaleString()}`
@@ -99,7 +106,7 @@ function getAddonDuration(addonName: string): number {
 }
 
 async function calculateRealPrices(
-  serviceTitle: string,
+  serviceTitles: string[],
   vehicleType: string,
   addonNames: string[]
 ) {
@@ -108,25 +115,26 @@ async function calculateRealPrices(
     const res = await fetch(`${baseUrl}/api/pricing`, { cache: "no-store" })
     const pricingData = await res.json()
 
-    // Find the service
-    const service = pricingData.services.find(
-      (s: any) => s.name === serviceTitle
-    )
-    if (!service) {
-      throw new Error(`Service not found: ${serviceTitle}`)
+    // Sum the price of every picked service for this vehicle type
+    let servicePrice = 0
+    for (const serviceTitle of serviceTitles) {
+      const service = pricingData.services.find((s: any) => s.name === serviceTitle)
+      if (!service) {
+        throw new Error(`Service not found: ${serviceTitle}`)
+      }
+      const servicePricing = service.prices[vehicleType]
+      if (!servicePricing) {
+        throw new Error(`Vehicle type not found for service: ${vehicleType}`)
+      }
+      servicePrice += servicePricing.effective_price
     }
-
-    // Get service price for vehicle type
-    const servicePricing = service.prices[vehicleType]
-    if (!servicePricing) {
-      throw new Error(`Vehicle type not found for service: ${vehicleType}`)
-    }
-    const servicePrice = servicePricing.effective_price
 
     // Get addon prices
     let totalAddonPrice = 0
     for (const addonName of addonNames) {
-      const addon = pricingData.addOns.find((a: any) => a.name === addonName)
+      const addon =
+        pricingData.addOns.find((a: any) => a.name === addonName) ||
+        (pricingData.shopItems || []).find((i: any) => i.name === addonName)
       if (addon) {
         totalAddonPrice += addon.effective_price
       }
@@ -149,123 +157,97 @@ function overlaps(startA: string, endA: string, startB: string, endB: string) {
 }
 
 async function syncToHubSpot(payload: BookingPayload, totalAmount = payload.totalAmount) {
+  const appointmentStartIso =
+    payload.appointmentStartIso ||
+    (payload.appointmentDate && payload.appointmentTime
+      ? new Date(`${payload.appointmentDate}T${payload.appointmentTime}:00+08:00`).toISOString()
+      : null)
+  await syncBookingToHubSpot({ ...payload, totalAmount, appointmentStartIso })
+}
+
+const CALENDLY_EVENT_PREFIX = "https://api.calendly.com/scheduled_events/"
+
+/**
+ * Looks up the booked time from Calendly. Needs CALENDLY_API_TOKEN
+ * (a Calendly personal access token). Returns null if not configured.
+ */
+async function resolveCalendlyEvent(eventUri: string) {
+  const token = process.env.CALENDLY_API_TOKEN
+  if (!token || !eventUri.startsWith(CALENDLY_EVENT_PREFIX)) return null
   try {
-    const token = process.env.HUBSPOT_ACCESS_TOKEN
-    if (!token) return
-
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    }
-
-    // Search for existing contact by email
-    const searchRes = await fetch('https://api.hubapi.com/crm/v3/objects/contacts/search', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        filterGroups: [{
-          filters: [{
-            propertyName: 'email',
-            operator: 'EQ',
-            value: payload.customerEmail,
-          }]
-        }]
-      })
+    const res = await fetch(eventUri, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
     })
-    const searchData = await searchRes.json()
-
-    let contactId: string | null = null
-
-    if (searchData.results?.length > 0) {
-      contactId = searchData.results[0].id
-    } else {
-      const contactRes = await fetch('https://api.hubapi.com/crm/v3/objects/contacts', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          properties: {
-            firstname: payload.customerName?.split(' ')[0] || '',
-            lastname: payload.customerName?.split(' ').slice(1).join(' ') || '',
-            email: payload.customerEmail,
-            phone: payload.customerPhone,
-            car_make: payload.vehicle.make,
-            car_model: payload.vehicle.model || '',
-            car_year: payload.vehicle.year || '',
-          }
-        })
-      })
-      const contactData = await contactRes.json()
-      contactId = contactData.id || null
+    if (!res.ok) {
+      console.error("✗ Calendly event lookup failed:", res.status)
+      return null
     }
-
-    // Create deal
-    const serviceMap: Record<string, string> = {
-  'Essential Wash': 'essential_wash',
-  'Premium Wash': 'premium_wash',
-  'Bronze Pack': 'bronze_pack',
-  'Silver Pack': 'silver_pack',
-  'Gold Pack': 'gold_pack',
-  'Paint Correction': 'paint_correction',
-  'Diamond Ceramic': 'diamond_ceramic',
-  'Titanium Ceramic Shield': 'titanium_ceramic_shield',
-  }
-    
-    const dealRes = await fetch('https://api.hubapi.com/crm/v3/objects/deals', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        properties: {
-          dealname: `${payload.customerName} — ${payload.serviceTitle}`,
-          amount: totalAmount,
-          dealstage: 'appointmentscheduled',
-          pipeline: 'default',
-          customer_name: payload.customerName,
-          customer_email: payload.customerEmail,
-          customer_phone: payload.customerPhone,
-          service: serviceMap[payload.serviceTitle] || payload.serviceTitle.toLowerCase().replace(/ /g, '_'),
-          addons: payload.addons.length > 0 ? payload.addons.map(a => a.name).join(', ') : '',
-          car_make: payload.vehicle.make,
-          car_model: payload.vehicle.model || '',
-          car_year: payload.vehicle.year || '',
-          closedate: new Date(`${payload.appointmentDate}T${payload.appointmentTime}:00+08:00`).toISOString(),
-        }
-      })
-    })
-    const dealData = await dealRes.json()
-    console.log('Deal creation response:', JSON.stringify(dealData))
-
-    // Associate deal with contact
-    if (contactId && dealData.id) {
-      await fetch(`https://api.hubapi.com/crm/v3/objects/deals/${dealData.id}/associations/contacts/${contactId}/3`, {
-        method: 'PUT',
-        headers,
-      })
-    }
-
-    console.log('✓ HubSpot synced - deal:', JSON.stringify(dealData))
+    const data = await res.json()
+    const startIso: string | undefined = data?.resource?.start_time
+    if (!startIso) return null
+    const start = new Date(startIso)
+    const date = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(start)
+    const time = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Manila",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(start)
+    return { date, time, startIso }
   } catch (err) {
-    console.error('HubSpot sync failed:', err)
+    console.error("✗ Calendly event lookup failed:", err)
+    return null
   }
 }
 
 export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as BookingPayload
+    payload.addons = Array.isArray(payload.addons) ? payload.addons : []
+    const isCalendlyBooking = Boolean(payload.calendlyEventUri)
+
+    if (isCalendlyBooking) {
+      // Never trust a date/time sent by the browser for Calendly bookings;
+      // only use what Calendly itself reports.
+      payload.appointmentDate = ""
+      payload.appointmentTime = ""
+      payload.appointmentStartIso = null
+      const calendlyEvent = await resolveCalendlyEvent(payload.calendlyEventUri!)
+      if (calendlyEvent) {
+        payload.appointmentDate = calendlyEvent.date
+        payload.appointmentTime = calendlyEvent.time
+        payload.appointmentStartIso = calendlyEvent.startIso
+      } else {
+        console.warn("⚠ CALENDLY_API_TOKEN not set or lookup failed - booking saved without a time")
+      }
+    }
+
+    const hasSchedule = Boolean(payload.appointmentDate && payload.appointmentTime)
 
     if (
       !payload.customerEmail ||
       !payload.customerPhone ||
       !payload.serviceTitle ||
-      !payload.appointmentDate ||
-      !payload.appointmentTime
+      (!isCalendlyBooking && !hasSchedule)
     ) {
       return NextResponse.json({ error: "Missing required booking fields." }, { status: 400 })
     }
 
     // Calculate real prices server-side
     const addonNames = payload.addons.map((a) => a.name)
+    // An empty serviceTitles list means an add-ons-only booking
+    const serviceTitles = Array.isArray(payload.serviceTitles) ? payload.serviceTitles : [payload.serviceTitle]
+    if (serviceTitles.length === 0 && payload.addons.length === 0) {
+      return NextResponse.json({ error: "Pick at least one service or add-on." }, { status: 400 })
+    }
     const calculatedPrices = await calculateRealPrices(
-      payload.serviceTitle,
+      serviceTitles,
       payload.vehicle.type,
       addonNames
     )
@@ -303,8 +285,12 @@ export async function POST(request: Request) {
         ? payload.addons.map((addon) => `- ${addon.name} (${currency(addon.price)})`).join("\n")
         : "None"
 
-    const slotLabel = formatSlot(payload.appointmentDate, payload.appointmentTime)
-    const serviceDuration = getServiceDuration(payload.serviceTitle)
+    const slotLabel = hasSchedule
+      ? formatSlot(payload.appointmentDate, payload.appointmentTime)
+      : "Booked via Calendly (see your Calendly confirmation)"
+    const sheetDate = hasSchedule ? formatAppointmentDate(payload.appointmentDate) : "Via Calendly"
+    const sheetTime = hasSchedule ? formatAppointmentTime(payload.appointmentTime) : "Via Calendly"
+    const serviceDuration = serviceTitles.reduce((sum, title) => sum + getServiceDuration(title), 0)
     const addOnDuration = payload.addons
       .map((addon) => getAddonDuration(addon.name))
       .reduce((sum, minutes) => sum + minutes, 0)
@@ -392,7 +378,10 @@ export async function POST(request: Request) {
       ${emailShellEnd}
     `
 
+    // Calendly already puts the appointment on the calendar it's connected to,
+    // so we only create our own Google Calendar event for non-Calendly bookings.
     const hasGoogleConfig =
+      !isCalendlyBooking &&
       Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_CLIENT_EMAIL) &&
       Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) &&
       Boolean(process.env.GOOGLE_CALENDAR_ID)
@@ -477,7 +466,11 @@ export async function POST(request: Request) {
         console.error("✗ Google Calendar API failed:", calendarErrorMsg)
       }
     } else {
-      console.warn("⚠ Google Calendar not configured - skipping calendar sync")
+      console.warn(
+        isCalendlyBooking
+          ? "Calendly booking - Calendly handles the calendar event"
+          : "⚠ Google Calendar not configured - skipping calendar sync",
+      )
     }
 
     const ownerEmail = BOOKING_OWNER_EMAIL || BOOKING_OWNER_EMAIL_ADDRESS || FALLBACK_OWNER_EMAIL
@@ -529,14 +522,14 @@ export async function POST(request: Request) {
             addons: formatAddons(payload.addons),
           totalAmount: `PHP ${finalTotalAmount.toLocaleString()}`,
             vehicle: formatVehicle(payload.vehicle),
-            appointmentDate: formatAppointmentDate(payload.appointmentDate),
-            appointmentTime: formatAppointmentTime(payload.appointmentTime),
+            appointmentDate: sheetDate,
+            appointmentTime: sheetTime,
           })
         }
 
         await syncToHubSpot(payload, finalTotalAmount)
 
-        return NextResponse.json({ ok: true, emailSent, ownerEmailSent, emailProvider: "resend", eventLink })
+        return NextResponse.json({ ok: true, emailSent, ownerEmailSent, emailProvider: "resend", eventLink, scheduleLabel: hasSchedule ? slotLabel : null })
       } catch (resendError) {
         const errorMsg = resendError instanceof Error ? resendError.message : "Unknown error"
         console.error("✗ Resend API failed:", errorMsg)
@@ -595,14 +588,14 @@ export async function POST(request: Request) {
             addons: formatAddons(payload.addons),
             totalAmount: `PHP ${finalTotalAmount.toLocaleString()}`,
             vehicle: formatVehicle(payload.vehicle),
-            appointmentDate: formatAppointmentDate(payload.appointmentDate),
-            appointmentTime: formatAppointmentTime(payload.appointmentTime),
+            appointmentDate: sheetDate,
+            appointmentTime: sheetTime,
           })
         }
 
         await syncToHubSpot(payload, finalTotalAmount)
 
-        return NextResponse.json({ ok: true, emailSent: true, ownerEmailSent, emailProvider: "smtp", eventLink })
+        return NextResponse.json({ ok: true, emailSent: true, ownerEmailSent, emailProvider: "smtp", eventLink, scheduleLabel: hasSchedule ? slotLabel : null })
       } catch (smtpError) {
         const errorMsg = smtpError instanceof Error ? smtpError.message : "Unknown error"
         console.error("✗ SMTP failed:", errorMsg)
@@ -623,8 +616,8 @@ export async function POST(request: Request) {
         addons: formatAddons(payload.addons),
         totalAmount: `PHP ${finalTotalAmount.toLocaleString()}`,
         vehicle: formatVehicle(payload.vehicle),
-        appointmentDate: formatAppointmentDate(payload.appointmentDate),
-        appointmentTime: formatAppointmentTime(payload.appointmentTime),
+        appointmentDate: sheetDate,
+        appointmentTime: sheetTime,
       })
     }
 
@@ -635,6 +628,7 @@ export async function POST(request: Request) {
       emailSent: false,
       ownerEmailSent: false,
       eventLink,
+      scheduleLabel: hasSchedule ? slotLabel : null,
       message: "Booking saved, but no email provider is configured.",
     })
   } catch (error) {
