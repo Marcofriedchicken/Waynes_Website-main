@@ -222,19 +222,19 @@ export async function GET(request: Request) {
       // Determine overnight behavior
       const isOvernight = isCeramic && toMs(completionIso) > businessCloseMs
 
-      // 6:00 PM grace rule
+      // Closing-time grace rule (last slot one hour before close)
       const [slotHourStr, slotMinStr] = slot.split(":")
       const slotHour = Number(slotHourStr)
       const slotMin = Number(slotMinStr)
 
-      // If duration > 80 mins, last allowed slot is 17:00
-      if (totalDuration > 80 && (slotHour >= 17)) {
+      // If duration > 80 mins, last allowed start is one hour before close
+      if (totalDuration > 80 && (slotHour >= closeHour - 1)) {
         return { time: slot, available: false, reason: "Exceeds operating hours" }
       }
 
-      // If completion exceeds close and not overnight-allowed and not the 6pm grace allowed case, mark unavailable
-      const isSixPmGrace = slotHour === 17 && slotMin === 0 && ( (poolId === "A") || isPaint ) && totalDuration <= 80
-      if (!isOvernight && !isSixPmGrace && completionDate.getTime() > new Date(`${date}T${pad(closeHour)}:00:00+08:00`).getTime()) {
+      // If completion exceeds close and not overnight-allowed and not the closing-time grace case, mark unavailable
+      const isClosingGrace = slotHour === closeHour - 1 && slotMin === 0 && ( (poolId === "A") || isPaint ) && totalDuration <= 80
+      if (!isOvernight && !isClosingGrace && completionDate.getTime() > new Date(`${date}T${pad(closeHour)}:00:00+08:00`).getTime()) {
         return { time: slot, available: false, reason: "Exceeds operating hours" }
       }
 

@@ -31,7 +31,7 @@ export function Hero({ onBookNow }: HeroProps) {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 text-center px-4 max-w-5xl mx-auto pt-20">
+      <div className="relative z-10 text-center px-4 max-w-5xl mx-auto pt-44 md:pt-28">
         {/* Subtitle */}
         <motion.p
           className="text-[#D4A843] text-sm md:text-base tracking-[0.3em] font-medium mb-6 mt-8 [text-shadow:_0_2px_8px_rgba(0,0,0,0.95)]"
@@ -108,7 +108,7 @@ export function Hero({ onBookNow }: HeroProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
         >
-          7AM–6PM <span className="text-[#D4A843] mx-1">•</span> 7 DAYS
+          7AM–7PM <span className="text-[#D4A843] mx-1">•</span> 7 DAYS
         </motion.p>
       </div>
 

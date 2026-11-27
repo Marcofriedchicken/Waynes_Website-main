@@ -2,9 +2,10 @@
 
 import { type MouseEvent } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Phone, MessageCircle, Inbox } from "lucide-react"
+import { X, Phone, MessageCircle, Inbox, Gift } from "lucide-react"
 import { useContactModal } from "@/hooks/use-contact-modal"
 import { businessInfo } from "@/lib/site-info"
+import { decemberPromo, usePromoActive } from "@/lib/promo"
 
 function MessengerIcon({ className = "w-6 h-6" }: { className?: string }) {
   return (
@@ -15,6 +16,17 @@ function MessengerIcon({ className = "w-6 h-6" }: { className?: string }) {
 }
 
 const contactOptions = [
+  {
+    id: "paint-check",
+    title: "Free paint check",
+    subtitle: `December promo · only ${decemberPromo.slots} slots`,
+    icon: Gift,
+    bgColor: "bg-[#ED0407]/20",
+    iconColor: "text-[#ED0407]",
+    href: decemberPromo.formUrl,
+    target: "_blank",
+    rel: "noopener noreferrer",
+  },
   {
     id: "messenger",
     title: "Messenger",
@@ -62,6 +74,8 @@ const contactOptions = [
 
 export function ContactModal() {
   const { isOpen, closeModal } = useContactModal()
+  const promoActive = usePromoActive()
+  const visibleOptions = contactOptions.filter((option) => option.id !== "paint-check" || promoActive)
 
   const handleOptionClick = (event: MouseEvent<HTMLAnchorElement>, option: (typeof contactOptions)[number]) => {
     if (option.id === "viber") {
@@ -130,7 +144,7 @@ export function ContactModal() {
 
               {/* Options */}
               <div className="space-y-4">
-                {contactOptions.map((option) => {
+                {visibleOptions.map((option) => {
                   const Icon = option.icon
                   return (
                     <motion.a

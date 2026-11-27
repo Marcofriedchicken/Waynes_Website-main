@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X, Phone } from "lucide-react"
 import { useContactModal } from "@/hooks/use-contact-modal"
+import { PromoBanner } from "@/components/promo-banner"
 
 const navLinks = [
   { name: "SERVICES", href: "#services" },
@@ -60,7 +61,7 @@ export function Navbar({ onBookNow }: NavbarProps) {
     const targetId = href.replace("#", "")
     const element = document.getElementById(targetId)
     if (element) {
-      const navHeight = 100
+      const navHeight = document.querySelector("nav")?.getBoundingClientRect().height ?? 100
       const elementPosition = element.getBoundingClientRect().top + window.scrollY
       window.scrollTo({
         top: elementPosition - navHeight,
@@ -79,6 +80,8 @@ export function Navbar({ onBookNow }: NavbarProps) {
           scrolled ? "bg-[#0A0A0A]/95 backdrop-blur-md shadow-lg" : "bg-[#0A0A0A]/80"
         }`}
       >
+        <PromoBanner />
+
         {/* Red accent line */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-0.5 bg-[#ED0407]" />
         
