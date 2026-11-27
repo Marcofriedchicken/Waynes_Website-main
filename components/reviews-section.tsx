@@ -3,6 +3,7 @@
 import { motion } from "framer-motion"
 import { Quote, Star } from "lucide-react"
 import { reviews } from "@/lib/reviews-data"
+import { businessInfo } from "@/lib/site-info"
 
 function getInitials(name: string) {
   return name
@@ -90,6 +91,25 @@ export function ReviewsSection() {
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{content}</div>
+
+        <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <a
+            href={businessInfo.googleReviewsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-6 py-3 rounded-xl bg-[#ED0407] text-white font-bold hover:bg-[#ED0407]/90 transition-colors"
+          >
+            Leave us a Google review
+          </a>
+          <a
+            href={businessInfo.googleReviewsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-6 py-3 rounded-xl border border-[#2A2A2A] text-white/80 font-bold hover:border-[#D4A843]/60 hover:text-white transition-colors"
+          >
+            See all reviews on Google
+          </a>
+        </div>
       </div>
     </section>
   )
