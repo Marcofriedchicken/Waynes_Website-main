@@ -473,7 +473,17 @@ export async function POST(request: Request) {
       )
     }
 
-    const ownerEmail = BOOKING_OWNER_EMAIL || BOOKING_OWNER_EMAIL_ADDRESS || FALLBACK_OWNER_EMAIL
+    // Every address here gets the "New Booking" alert
+    const EXTRA_NOTIFY_EMAILS = ["luismiguelvalladolid007@gmail.com"]
+    const ownerEmails = Array.from(
+      new Set(
+        [BOOKING_OWNER_EMAIL || BOOKING_OWNER_EMAIL_ADDRESS || FALLBACK_OWNER_EMAIL, ...EXTRA_NOTIFY_EMAILS]
+          .flatMap((e) => (e || "").split(","))
+          .map((e) => e.trim())
+          .filter(Boolean),
+      ),
+    )
+    const ownerEmail = ownerEmails.join(", ")
     const customerSubject = "Booking Confirmation - Wayne's Detailing"
     const ownerSubject = `New Booking: ${payload.serviceTitle} - ${payload.customerName || payload.customerPhone}`
     const customerText = `WAYNE'S DETAILING\nGET IT DONE\n\nBOOKING CONFIRMED\n\nThank you, ${payload.customerName || "there"}.\nYour appointment has been successfully scheduled.\n\n${bookingText}\n\nQuestions? Reply to this email or call 0917-376-3348.`
@@ -497,7 +507,7 @@ export async function POST(request: Request) {
         if (ownerEmail) {
           const ownerEmailResult = await resend.emails.send({
             from: RESEND_FROM_EMAIL,
-            to: ownerEmail,
+            to: ownerEmails,
             replyTo: payload.customerEmail,
             subject: ownerSubject,
             text: bookingText,
