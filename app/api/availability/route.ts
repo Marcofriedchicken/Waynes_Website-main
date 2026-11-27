@@ -5,7 +5,8 @@ import {
   OPERATING_HOURS,
   TIMEZONE,
   POOLS,
-  computeTotalDurationMinutes,
+  getServiceDuration,
+  getAddonDuration,
   getPoolIdForService,
   isCeramicService,
   isPaintCorrection,
@@ -82,9 +83,9 @@ function toManilaIso(date: Date) {
 function generateDaySlots() {
   const slots: string[] = []
   const { openHour, closeHour } = OPERATING_HOURS
-  for (let h = openHour; h <= closeHour; h++) {
+  // Hourly start times: 7:00 AM up to 6:00 PM
+  for (let h = openHour; h < closeHour; h++) {
     slots.push(`${pad(h)}:00`)
-    slots.push(`${pad(h)}:30`)
   }
   // dedupe and sort
   return Array.from(new Set(slots)).sort()
@@ -145,7 +146,11 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const date = searchParams.get("date")
-    const serviceTitle = searchParams.get("serviceTitle") || ""
+    // One or more services, comma-separated (serviceTitles), or a single serviceTitle
+    const serviceTitles = (searchParams.get("serviceTitles") || searchParams.get("serviceTitle") || "")
+      .split(",")
+      .map((s) => decodeURIComponent(s).trim())
+      .filter(Boolean)
     const addonsParam = searchParams.get("addons") || ""
     const addonNames = addonsParam ? addonsParam.split(",").map((s) => decodeURIComponent(s)) : []
 
@@ -153,10 +158,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Missing date query parameter." }, { status: 400 })
     }
 
-    const totalDuration = computeTotalDurationMinutes(serviceTitle, addonNames)
-    const poolId = getPoolIdForService(serviceTitle)
-    const isCeramic = isCeramicService(serviceTitle)
-    const isPaint = isPaintCorrection(serviceTitle)
+    // Total time = every picked service + every add-on
+    const totalDuration =
+      serviceTitles.reduce((sum, t) => sum + getServiceDuration(t), 0) +
+      addonNames.reduce((sum, a) => sum + getAddonDuration(a), 0)
+    // A car that needs any paint/ceramic work goes in a pool-B bay; add-ons-only bookings use pool A
+    const poolId = serviceTitles.some((t) => getPoolIdForService(t) === "B") ? "B" : "A"
+    const isCeramic = serviceTitles.some((t) => isCeramicService(t))
+    const isPaint = !isCeramic && serviceTitles.some((t) => isPaintCorrection(t))
 
     const hasGoogleConfig = GOOGLE_ENV_KEYS.every((key) => Boolean(process.env[key]))
     const prevDate = getRelativeDate(date, -1)
@@ -273,19 +282,19 @@ export async function GET(request: Request) {
 
       const poolCapacity = poolId === "A" ? POOLS.A.capacity : POOLS.B.capacity
 
-      if (overlappingCount >= poolCapacity) {
-        return { time: slot, available: false, reason: "No bays available" }
+      const spotsLeft = Math.max(poolCapacity - overlappingCount, 0)
+      if (spotsLeft === 0) {
+        return { time: slot, available: false, reason: "Fully booked", spotsLeft: 0, capacity: poolCapacity }
       }
 
       // Allowed slot
       if (isOvernight) {
-        return { time: slot, available: true, overnight: true, completion: "Next-day pickup" }
+        return { time: slot, available: true, overnight: true, completion: "Next-day pickup", spotsLeft, capacity: poolCapacity }
       }
 
       // Format completion time hh:mm
-      const compHours = String(completionDate.getHours()).padStart(2, "0")
-      const compMins = String(completionDate.getMinutes()).padStart(2, "0")
-      return { time: slot, available: true, overnight: false, completion: `${compHours}:${compMins}` }
+      // Manila wall-clock time (the server itself runs in UTC)
+      return { time: slot, available: true, overnight: false, completion: completionIso.slice(11, 16), spotsLeft, capacity: poolCapacity }
     })
 
     return NextResponse.json({ date, slots: resultSlots })

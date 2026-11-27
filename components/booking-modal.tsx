@@ -1,15 +1,62 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Info, Check, ChevronLeft } from "lucide-react"
+import { X, Info, Check, ChevronLeft, ChevronRight, Clock } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { services } from "./services-section"
 
-// Calendly booking page shown in the last step. Can be overridden with
-// NEXT_PUBLIC_CALENDLY_URL in Vercel without touching the code.
-const CALENDLY_URL =
-  process.env.NEXT_PUBLIC_CALENDLY_URL || "https://calendly.com/waynesdetailing2026/car-detailing-appointment"
+// How many days ahead customers can book
+const BOOKING_WINDOW_DAYS = 60
+// Minimum notice before a same-day slot (minutes)
+const MIN_NOTICE_MINUTES = 30
+
+type Slot = {
+  time: string // "HH:MM" Manila time
+  available: boolean
+  reason?: string
+  overnight?: boolean
+  completion?: string
+  spotsLeft?: number
+  capacity?: number
+}
+
+// Today's date in Manila as YYYY-MM-DD, plus the current Manila time in minutes
+function manilaNow() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date())
+  const v: Record<string, string> = {}
+  parts.forEach((p) => (v[p.type] = p.value))
+  return { date: `${v.year}-${v.month}-${v.day}`, minutes: Number(v.hour) * 60 + Number(v.minute) }
+}
+
+function addDays(dateStr: string, days: number) {
+  const d = new Date(`${dateStr}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
+function formatTime12(time24: string) {
+  const [h, m] = time24.split(":").map(Number)
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`
+}
+
+function formatDateLong(dateStr: string) {
+  return new Date(`${dateStr}T12:00:00Z`).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  })
+}
 
 interface BookingModalProps {
   isOpen: boolean
@@ -79,11 +126,17 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
   const [vehicleModel, setVehicleModel] = useState("")
   const [vehicleYear, setVehicleYear] = useState("")
   const [vehicleType, setVehicleType] = useState("")
-  const [calendlyHeight, setCalendlyHeight] = useState(700)
+  const [selectedDate, setSelectedDate] = useState<string>("")
+  const [selectedTime, setSelectedTime] = useState("")
+  const [slots, setSlots] = useState<Slot[]>([])
+  const [loadingSlots, setLoadingSlots] = useState(false)
+  const [slotError, setSlotError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
   const [scheduleLabel, setScheduleLabel] = useState<string | null>(null)
   const [submitNotice, setSubmitNotice] = useState("")
+  const dateStripRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
-  const bookingSentRef = useRef(false)
 
   // Load add-on names/prices
   useEffect(() => {
@@ -205,85 +258,109 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
     .filter(Boolean)
     .join(" ")
 
-  // Calendly embed URL, prefilled so the customer doesn't retype anything.
-  // a1 fills the first question on the Calendly event (by default
-  // "Please share anything that will help prepare for our meeting").
-  const calendlySrc = useMemo(() => {
-    if (step !== 3 || typeof window === "undefined") return ""
-    const url = new URL(CALENDLY_URL)
-    const notes = [
-      `${isAddOnOnly ? "Add-ons only" : "Service"}: ${bookingTitle}${vehicleType ? ` (${vehicleType})` : ""}`,
-      activeAddOns.length > 0 ? `Extras: ${activeAddOns.map((a) => a.name).join(", ")}` : "",
-      vehicleLabel ? `Vehicle: ${vehicleLabel}` : "",
-      `Phone: ${phone}`,
-      `Est. total: ${formatCurrency(calculateTotal())} · Est. time: ${formatDuration(calculateEstimatedDuration())}`,
-    ]
-      .filter(Boolean)
-      .join("\n")
-    url.searchParams.set("embed_domain", window.location.hostname)
-    url.searchParams.set("embed_type", "Inline")
-    url.searchParams.set("hide_gdpr_banner", "1")
-    url.searchParams.set("hide_event_type_details", "1")
-    url.searchParams.set("primary_color", "d4a843")
-    url.searchParams.set("name", name.trim())
-    url.searchParams.set("email", email.trim())
-    url.searchParams.set("a1", notes)
-    return url.toString()
-    // Only rebuild when entering step 3 so the calendar doesn't reload mid-booking
+  // Dates customers can pick: today (Manila) through the booking window
+  const today = manilaNow().date
+  const dateOptions = Array.from({ length: BOOKING_WINDOW_DAYS }, (_, i) => addDays(today, i))
+
+  // Load available times whenever the date (or what's being booked) changes
+  const availabilityKey = [
+    selectedDate,
+    selectedServicesData.map((s) => s.title).join(","),
+    activeAddOns.filter((a) => a.kind === "addon").map((a) => a.name).join(","),
+  ].join("|")
+
+  useEffect(() => {
+    if (step !== 3 || !selectedDate) return
+    let cancelled = false
+    const load = async () => {
+      setLoadingSlots(true)
+      setSlotError("")
+      setSelectedTime("")
+      try {
+        const params = new URLSearchParams()
+        params.set("date", selectedDate)
+        params.set("serviceTitles", selectedServicesData.map((s) => s.title).join(","))
+        const addonNames = activeAddOns.filter((a) => a.kind === "addon").map((a) => a.name.split("(")[0].trim())
+        if (addonNames.length > 0) params.set("addons", addonNames.join(","))
+        const res = await fetch(`/api/availability?${params.toString()}`)
+        const data = await res.json()
+        if (!res.ok) throw new Error(data?.error || "Couldn't load times.")
+        // The API returns plain "HH:MM" strings when the calendar isn't reachable
+        const list: Slot[] = (Array.isArray(data.slots) ? data.slots : []).map((x: any) =>
+          typeof x === "string" ? { time: x, available: true } : x,
+        )
+        if (!cancelled) setSlots(list)
+      } catch (err) {
+        if (!cancelled) {
+          setSlots([])
+          setSlotError(err instanceof Error ? err.message : "Couldn't load times.")
+        }
+      } finally {
+        if (!cancelled) setLoadingSlots(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, availabilityKey])
+
+  // Pick today by default when the customer reaches step 3
+  useEffect(() => {
+    if (step === 3 && !selectedDate) setSelectedDate(today)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
-  // Listen for Calendly's "booked" message from the embedded calendar
-  useEffect(() => {
-    if (step !== 3) return
+  // Same-day times need at least MIN_NOTICE_MINUTES notice
+  const isPastSlot = (time: string) => {
+    if (selectedDate !== today) return false
+    const [h, m] = time.split(":").map(Number)
+    return h * 60 + m < manilaNow().minutes + MIN_NOTICE_MINUTES
+  }
+  const visibleSlots = slots.filter((slot) => !isPastSlot(slot.time))
+  const selectedSlot = visibleSlots.find((s) => s.time === selectedTime)
 
-    const handleMessage = async (e: MessageEvent) => {
-      if (e.origin !== "https://calendly.com") return
-      const data = e.data
-      if (!data || typeof data.event !== "string") return
+  const scrollDates = (dir: number) => {
+    dateStripRef.current?.scrollBy({ left: dir * 280, behavior: "smooth" })
+  }
 
-      if (data.event === "calendly.page_height") {
-        const h = parseInt(String(data.payload?.height || ""), 10)
-        if (h > 300) setCalendlyHeight(h)
-        return
-      }
-
-      if (data.event !== "calendly.event_scheduled" || bookingSentRef.current) return
-      bookingSentRef.current = true
-
-      try {
-        const response = await fetch("/api/bookings", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            customerName: name.trim(),
-            customerEmail: email.trim(),
-            customerPhone: phone.trim(),
-            serviceTitle: bookingTitle,
-            serviceTitles: selectedServicesData.map((s) => s.title),
-            serviceBasePrice: servicesPrice,
-            vehicle: { make: vehicleMake, model: vehicleModel, year: vehicleYear, type: vehicleType },
-            addons: activeAddOns.map((a) => ({ name: a.name, price: a.price })),
-            totalAmount: calculateTotal(),
-            calendlyEventUri: data.payload?.event?.uri || "",
-            calendlyInviteeUri: data.payload?.invitee?.uri || "",
-          }),
-        })
-        const result = await response.json().catch(() => null)
-        if (!response.ok) throw new Error(result?.error || "Failed to save booking details.")
-        setScheduleLabel(result?.scheduleLabel || null)
-      } catch (error) {
-        // The slot is already booked in Calendly, so don't block the customer.
-        console.error("Booking details sync failed:", error)
-        setSubmitNotice("Your time slot is booked. If anything looks off, call us at 0917-376-3348.")
+  const handleConfirmBooking = async () => {
+    if (!selectedDate || !selectedSlot || isSubmitting) return
+    setIsSubmitting(true)
+    setSubmitError("")
+    try {
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerName: name.trim(),
+          customerEmail: email.trim(),
+          customerPhone: phone.trim(),
+          serviceTitle: bookingTitle,
+          serviceTitles: selectedServicesData.map((s) => s.title),
+          serviceBasePrice: servicesPrice,
+          vehicle: { make: vehicleMake, model: vehicleModel, year: vehicleYear, type: vehicleType },
+          addons: activeAddOns.map((a) => ({ name: a.name, price: a.price })),
+          appointmentDate: selectedDate,
+          appointmentTime: selectedSlot.time,
+          totalAmount: calculateTotal(),
+          overnight: Boolean(selectedSlot.overnight),
+        }),
+      })
+      const result = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(result?.error || "Couldn't book this time. Please pick another.")
+      setScheduleLabel(`${formatDateLong(selectedDate)} at ${formatTime12(selectedSlot.time)}`)
+      if (result?.emailSent === false) {
+        setSubmitNotice("You're booked. Your confirmation email may take a little longer to arrive.")
       }
       setStep(4)
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Couldn't book this time. Please pick another.")
+    } finally {
+      setIsSubmitting(false)
     }
-
-    window.addEventListener("message", handleMessage)
-    return () => window.removeEventListener("message", handleMessage)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step])
+  }
 
   const handleClose = () => {
     setStep(1)
@@ -296,10 +373,14 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
     setVehicleModel("")
     setVehicleYear("")
     setVehicleType("")
-    setCalendlyHeight(700)
+    setSelectedDate("")
+    setSelectedTime("")
+    setSlots([])
+    setSlotError("")
+    setSubmitError("")
+    setIsSubmitting(false)
     setScheduleLabel(null)
     setSubmitNotice("")
-    bookingSentRef.current = false
     onClose()
   }
 
@@ -379,7 +460,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
           <motion.div
             ref={contentRef}
             className={`relative bg-white rounded-2xl w-full ${
-              step === 3 ? "max-w-3xl" : "max-w-lg"
+              step === 3 ? "max-w-xl" : "max-w-lg"
             } max-h-[92vh] overflow-auto shadow-2xl transition-[max-width] duration-300`}
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -475,7 +556,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
             </div>
 
             {/* Content */}
-            <div className={step === 3 ? "px-2 py-2 sm:px-4" : "p-6"}>
+            <div className="p-6">
               <AnimatePresence mode="wait">
                 {/* Step 1: Contact details */}
                 {step === 1 && (
@@ -715,16 +796,119 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
                   </motion.div>
                 )}
 
-                {/* Step 3: Calendly */}
+                {/* Step 3: Date & time */}
                 {step === 3 && (
-                  <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                    {calendlySrc && (
-                      <iframe
-                        src={calendlySrc}
-                        title="Pick a date and time"
-                        className="w-full border-0"
-                        style={{ height: calendlyHeight, minHeight: 650 }}
-                      />
+                  <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+                    {/* Date picker */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-bold text-gray-900">Pick a date</h3>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => scrollDates(-1)} aria-label="Earlier dates" className="w-9 h-9 rounded-full border-2 border-gray-200 flex items-center justify-center text-gray-700 hover:border-[#D4A843]">
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <button type="button" onClick={() => scrollDates(1)} aria-label="Later dates" className="w-9 h-9 rounded-full border-2 border-gray-200 flex items-center justify-center text-gray-700 hover:border-[#D4A843]">
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div ref={dateStripRef} className="flex gap-2 overflow-x-auto pb-2 snap-x [scrollbar-width:thin]">
+                        {dateOptions.map((d) => {
+                          const dt = new Date(`${d}T12:00:00Z`)
+                          const selected = d === selectedDate
+                          return (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => setSelectedDate(d)}
+                              aria-pressed={selected}
+                              className={`snap-start shrink-0 w-[68px] rounded-2xl border-2 py-3 text-center transition-all ${
+                                selected ? "border-[#D4A843] bg-[#D4A843] text-gray-900" : "border-gray-200 bg-white text-gray-900 hover:border-[#D4A843]/60"
+                              }`}
+                            >
+                              <div className={`text-xs font-bold uppercase ${selected ? "text-gray-900" : "text-gray-500"}`}>
+                                {d === today ? "Today" : dt.toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" })}
+                              </div>
+                              <div className="text-2xl font-black leading-tight">{dt.getUTCDate()}</div>
+                              <div className={`text-xs font-semibold uppercase ${selected ? "text-gray-900" : "text-gray-500"}`}>
+                                {dt.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Time slots */}
+                    {selectedDate && (
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Pick a time</h3>
+                        <p className="text-sm text-gray-500 mb-3">
+                          {formatDateLong(selectedDate)} · Philippine time · about {formatDuration(calculateEstimatedDuration())}
+                        </p>
+                        {loadingSlots ? (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {Array.from({ length: 6 }).map((_, i) => (
+                              <div key={i} className="h-[76px] rounded-xl bg-gray-100 animate-pulse" />
+                            ))}
+                          </div>
+                        ) : slotError ? (
+                          <p className="text-sm text-red-600">{slotError}</p>
+                        ) : visibleSlots.length === 0 ? (
+                          <p className="rounded-xl bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                            No times left on this day. Please pick another date.
+                          </p>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {visibleSlots.map((slot) => {
+                              const selected = selectedTime === slot.time
+                              const left = slot.spotsLeft ?? (slot.available ? 1 : 0)
+                              const full = !slot.available
+                              return (
+                                <button
+                                  key={slot.time}
+                                  type="button"
+                                  disabled={full}
+                                  onClick={() => setSelectedTime(slot.time)}
+                                  aria-pressed={selected}
+                                  className={`rounded-xl border-2 px-3 py-3 text-left transition-all ${
+                                    selected
+                                      ? "border-[#D4A843] bg-[#D4A843]/10"
+                                      : full
+                                      ? "border-gray-100 bg-gray-50 cursor-not-allowed"
+                                      : "border-gray-200 bg-white hover:border-[#D4A843]/60"
+                                  }`}
+                                >
+                                  <div className={`text-base font-bold ${full ? "text-gray-400" : "text-gray-900"}`}>{formatTime12(slot.time)}</div>
+                                  <div
+                                    className={`mt-1 text-xs font-semibold ${
+                                      full ? "text-gray-400" : left === 1 ? "text-amber-600" : "text-emerald-600"
+                                    }`}
+                                  >
+                                    {full
+                                      ? slot.reason === "Exceeds operating hours"
+                                        ? "Too late to finish"
+                                        : "Fully booked"
+                                      : `${left} spot${left === 1 ? "" : "s"} left`}
+                                  </div>
+                                  {!full && (
+                                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-500">
+                                      <Clock className="w-3 h-3" />
+                                      {slot.overnight ? "Next-day pickup" : slot.completion ? `Done by ${formatTime12(slot.completion)}` : ""}
+                                    </div>
+                                  )}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                        {selectedSlot?.overnight && (
+                          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                            This job runs past closing, so your car will be ready for pickup the next day.
+                          </p>
+                        )}
+                        {submitError && <p className="mt-3 text-sm text-red-600">{submitError}</p>}
+                      </div>
                     )}
                   </motion.div>
                 )}
@@ -737,7 +921,7 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold text-gray-900 mb-2">Booking Confirmed!</h3>
-                      <p className="text-gray-500">Check your email for your confirmation and calendar invite.</p>
+                      <p className="text-gray-500">We&apos;ve emailed your confirmation. See you at the shop!</p>
                     </div>
                     <div className="bg-gray-50 rounded-xl p-4 text-left space-y-3">
                       {!isAddOnOnly && (
@@ -783,12 +967,22 @@ export function BookingModal({ isOpen, onClose, initialServiceId, initialAddOnId
                   </motion.button>
                 </div>
               ) : step === 3 ? (
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
                   <button onClick={handleBack} className="flex items-center gap-1 text-gray-500 hover:text-gray-700 font-medium">
                     <ChevronLeft className="w-4 h-4" />
                     BACK
                   </button>
-                  <p className="text-xs text-gray-400 text-right">Pick a time above to confirm your booking.</p>
+                  <motion.button
+                    onClick={handleConfirmBooking}
+                    disabled={!selectedSlot || isSubmitting}
+                    className={`flex-1 py-4 rounded-full font-bold text-lg transition-all ${
+                      selectedSlot && !isSubmitting ? "bg-[#D4A843] hover:bg-[#D4A843]/90 text-gray-900" : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    }`}
+                    whileHover={selectedSlot && !isSubmitting ? { scale: 1.02 } : {}}
+                    whileTap={selectedSlot && !isSubmitting ? { scale: 0.98 } : {}}
+                  >
+                    {isSubmitting ? "BOOKING..." : selectedSlot ? `BOOK ${formatTime12(selectedSlot.time)} →` : "PICK A TIME"}
+                  </motion.button>
                 </div>
               ) : (
                 <motion.button
