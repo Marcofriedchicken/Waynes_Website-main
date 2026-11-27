@@ -9,7 +9,7 @@ import { services } from "./services-section"
 // Calendly booking page shown in the last step. Can be overridden with
 // NEXT_PUBLIC_CALENDLY_URL in Vercel without touching the code.
 const CALENDLY_URL =
-  process.env.NEXT_PUBLIC_CALENDLY_URL || "https://calendly.com/waynesdetailing2026/30min"
+  process.env.NEXT_PUBLIC_CALENDLY_URL || "https://calendly.com/waynesdetailing2026/car-detailing-appointment"
 
 interface BookingModalProps {
   isOpen: boolean
