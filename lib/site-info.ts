@@ -10,7 +10,7 @@ export const businessInfo = {
   instagramUrl: "https://www.instagram.com/waynesdetailing/",
   tiktokUrl: "https://www.tiktok.com/@waynes.detailing",
   googleReviewsUrl: "https://maps.google.com/?cid=13788128340623235059",
-  hours: "Daily: 7:00 AM – 6:00 PM",
+  hours: "Daily: 7:00 AM – 7:00 PM",
   mapsQuery: "201 Mercedes Ave, San Miguel, Pasig, 1600 Metro Manila",
   googleMapsDirectionsUrl:
     "https://www.google.com/maps/dir/?api=1&destination=201+Mercedes+Ave+San+Miguel+Pasig+1600+Metro+Manila",

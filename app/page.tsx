@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Hero } from "@/components/hero"
+import { PromoSection } from "@/components/promo-section"
 import { StatsBar } from "@/components/stats-bar"
 import { ServicesSection } from "@/components/services-section"
 import { OurWorkSection } from "@/components/our-work-section"
@@ -35,6 +36,7 @@ export default function Home() {
       <main className="min-h-screen bg-[#0A0A0A]">
         <Navbar onBookNow={() => openBooking()} />
         <Hero onBookNow={() => openBooking()} />
+        <PromoSection />
         <StatsBar />
         <ServicesSection onBookService={(id) => openBooking(id)} />
         <OurWorkSection />
